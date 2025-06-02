@@ -3,6 +3,7 @@ import MyPlateCalculator from './MyPlateCalculator';
 import InventoryManager from './InventoryManager';
 import OrderingSystem from './OrderingSystem';
 import SurveyInterface from './SurveyInterface';
+import DistributionInterface from './DistributionInterface';
 import ReportView from './ReportView';
 import UnitConfiguration from './UnitConfiguration';
 
@@ -166,44 +167,31 @@ const Dashboard = () => {
     console.log('Survey data received:', surveyData);
     
     // Update inventory based on survey data
-    if (surveyData.type !== 'DISTRIBUTION' && surveyData.categoryTotals) {
-      setCurrentInventory(prev => {
-        const updated = { ...prev };
+    setCurrentInventory(prev => {
+      const updated = { ...prev };
+      
+      if (surveyData.type === 'DISTRIBUTION') {
+        // Subtract from inventory for distributions
         Object.entries(surveyData.categoryTotals).forEach(([category, weight]) => {
-          if (surveyData.type === 'SINGLE' || surveyData.type === 'BULK') {
-            // Add to inventory
-            updated[category] = (updated[category] || 0) + weight;
-          }
+          updated[category] = Math.max(0, (updated[category] || 0) - weight);
         });
-        return updated;
-      });
-    }
-
-    // Handle distribution - subtract from inventory
-    if (surveyData.type === 'DISTRIBUTION' && surveyData.distribution) {
-      const distributedWeight = parseFloat(surveyData.distribution.totalDistributed) || 0;
-      // For now, distribute proportionally across categories
-      const totalCurrent = Object.values(currentInventory).reduce((sum, val) => sum + val, 0);
-      if (totalCurrent > 0) {
-        setCurrentInventory(prev => {
-          const updated = { ...prev };
-          Object.keys(updated).forEach(category => {
-            const proportion = updated[category] / totalCurrent;
-            const reduction = distributedWeight * proportion;
-            updated[category] = Math.max(0, updated[category] - reduction);
-          });
-          return updated;
+      } else if (surveyData.type === 'SINGLE' || surveyData.type === 'BULK') {
+        // Add to inventory for intake
+        Object.entries(surveyData.categoryTotals).forEach(([category, weight]) => {
+          updated[category] = (updated[category] || 0) + weight;
         });
       }
-    }
+      
+      return updated;
+    });
 
     // Add to activity feed
     const activityMessage = surveyData.type === 'DISTRIBUTION' 
-      ? `Distributed ${surveyData.distribution?.totalDistributed || '?'} to ${surveyData.distribution?.clientsServed || '?'} clients`
+      ? `Distributed ${surveyData.totalDistributed.toFixed(1)} lbs to ${surveyData.clientsServed || '?'} clients (${surveyData.recipient})`
       : `Added ${surveyData.items?.length || 0} items from ${surveyData.source}`;
 
     setRecentActivity(prev => [{
-      type: surveyData.type === 'DISTRIBUTION' ? 'DISTRIBUTION' : 'INTAKE',
+      type: surveyData.type,
       message: activityMessage,
       time: 'Just now',
       timestamp: new Date().toISOString()
@@ -234,14 +222,18 @@ const Dashboard = () => {
     const vegPercentage = (currentInventory.VEG / total) * 100;
     const fruitPercentage = (currentInventory.FRUIT / total) * 100;
     const proteinPercentage = (currentInventory.PROTEIN / total) * 100;
+    const dairyPercentage = (currentInventory.DAIRY / total) * 100;
+    const grainPercentage = (currentInventory.GRAIN / total) * 100;
     
     // MyPlate compliance check
     const vegOK = vegPercentage >= 13 && vegPercentage <= 17;
     const fruitOK = fruitPercentage >= 13 && fruitPercentage <= 17;
     const proteinOK = proteinPercentage >= 18 && proteinPercentage <= 22;
+    const dairyOK = dairyPercentage >= 2 && dairyPercentage <= 4;
+    const grainOK = grainPercentage >= 13 && grainPercentage <= 17;
     
-    const compliantCategories = [vegOK, fruitOK, proteinOK].filter(Boolean).length;
-    return `${compliantCategories}/3 Categories Compliant`;
+    const compliantCategories = [vegOK, fruitOK, proteinOK, dairyOK, grainOK].filter(Boolean).length;
+    return `${compliantCategories}/5 Categories Compliant`;
   };
 
   const getNutritionalScore = () => {
@@ -324,6 +316,12 @@ const Dashboard = () => {
             onClick={() => setActiveTab('survey')}
           >
             Data Entry
+          </button>
+          <button 
+            className={activeTab === 'distribution' ? 'active' : ''}
+            onClick={() => setActiveTab('distribution')}
+          >
+            Distribution
           </button>
           <button 
             className={activeTab === 'inventory' ? 'active' : ''}
@@ -480,8 +478,15 @@ const Dashboard = () => {
           <SurveyInterface onDataSubmit={handleSurveySubmit} />
         )}
 
+        {activeTab === 'distribution' && (
+          <DistributionInterface onDataSubmit={handleSurveySubmit} />
+        )}
+
         {activeTab === 'inventory' && (
-          <InventoryManager currentInventory={currentInventory} />
+          <InventoryManager 
+            currentInventory={currentInventory} 
+            onNavigate={setActiveTab}
+          />
         )}
 
         {activeTab === 'myplate' && (

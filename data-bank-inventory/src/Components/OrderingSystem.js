@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 const OrderingSystem = ({ currentInventory }) => {
   const [projectionMode, setProjectionMode] = useState('weekly');
   const [weeklyDistribution, setWeeklyDistribution] = useState(50000);
+  const [targetCapacity, setTargetCapacity] = useState(900000);
   const [customOrders, setCustomOrders] = useState({});
   const [orderHistory, setOrderHistory] = useState([]);
 
@@ -17,9 +18,6 @@ const OrderingSystem = ({ currentInventory }) => {
     'PRODUCE': 20   // 20%
   };
 
-  // Default target capacity
-  const targetCapacity = 900000; // 900,000 lbs
-
   // Load saved data from localStorage on component mount
   useEffect(() => {
     try {
@@ -27,6 +25,7 @@ const OrderingSystem = ({ currentInventory }) => {
       const savedCustomOrders = localStorage.getItem('customOrders');
       const savedProjectionMode = localStorage.getItem('projectionMode');
       const savedWeeklyDistribution = localStorage.getItem('weeklyDistribution');
+      const savedTargetCapacity = localStorage.getItem('orderingTargetCapacity');
 
       if (savedOrderHistory) {
         setOrderHistory(JSON.parse(savedOrderHistory));
@@ -39,6 +38,9 @@ const OrderingSystem = ({ currentInventory }) => {
       }
       if (savedWeeklyDistribution) {
         setWeeklyDistribution(parseInt(savedWeeklyDistribution));
+      }
+      if (savedTargetCapacity) {
+        setTargetCapacity(parseInt(savedTargetCapacity));
       }
     } catch (error) {
       console.error('Error loading ordering data from localStorage:', error);
@@ -81,13 +83,24 @@ const OrderingSystem = ({ currentInventory }) => {
     }
   }, [weeklyDistribution]);
 
+  // Save target capacity to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('orderingTargetCapacity', targetCapacity.toString());
+    } catch (error) {
+      console.error('Error saving target capacity to localStorage:', error);
+    }
+  }, [targetCapacity]);
+
   const calculateOrderNeeds = () => {
     const total = Object.values(currentInventory || {}).reduce((sum, val) => sum + val, 0);
     
     if (total === 0) {
       // If no inventory, calculate based on targets
       return Object.entries(myplateTargets).map(([category, percentage]) => {
-        const targetWeight = (targetCapacity * percentage) / 100;
+        const targetWeight = projectionMode === 'weekly' 
+          ? (weeklyDistribution * percentage) / 100
+          : (targetCapacity * percentage) / 100;
         return {
           category,
           current: 0,
@@ -104,7 +117,12 @@ const OrderingSystem = ({ currentInventory }) => {
     return Object.entries(myplateTargets).map(([category, targetPercentage]) => {
       const current = currentInventory[category] || 0;
       const currentPercentage = (current / total) * 100;
-      const targetWeight = (total * targetPercentage) / 100;
+      
+      // Calculate target weight based on projection mode
+      const targetWeight = projectionMode === 'weekly'
+        ? (weeklyDistribution * targetPercentage) / 100
+        : (targetCapacity * targetPercentage) / 100;
+      
       const needed = Math.max(0, targetWeight - current);
       
       let priority = 'normal';
@@ -171,6 +189,7 @@ const OrderingSystem = ({ currentInventory }) => {
       customOrders,
       projectionMode,
       weeklyDistribution,
+      targetCapacity,
       exportDate: new Date().toISOString()
     };
     
@@ -238,7 +257,7 @@ const OrderingSystem = ({ currentInventory }) => {
         </div>
       ) : (
         <>
-          {projectionMode === 'weekly' && (
+          {projectionMode === 'weekly' ? (
             <div className="projection-controls">
               <label>
                 Weekly Distribution Target:
@@ -246,6 +265,19 @@ const OrderingSystem = ({ currentInventory }) => {
                   type="number"
                   value={weeklyDistribution}
                   onChange={(e) => setWeeklyDistribution(parseInt(e.target.value))}
+                  className="distribution-input"
+                />
+                lbs
+              </label>
+            </div>
+          ) : (
+            <div className="projection-controls">
+              <label>
+                Target Capacity:
+                <input
+                  type="number"
+                  value={targetCapacity}
+                  onChange={(e) => setTargetCapacity(parseInt(e.target.value))}
                   className="distribution-input"
                 />
                 lbs

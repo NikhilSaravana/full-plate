@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getMyPlateCategory } from './FoodCategoryMapper';
 import { UnitConverters } from './UnitConfiguration';
 
-const InventoryManager = ({ currentInventory }) => {
+const InventoryManager = ({ currentInventory, onNavigate }) => {
   const [detailedInventory, setDetailedInventory] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -219,7 +219,7 @@ const InventoryManager = ({ currentInventory }) => {
           <h3>📦 No Inventory Data</h3>
           <p>Start by adding your first inventory items using the "Data Entry" tab, or add individual items below.</p>
           <button
-            onClick={() => setShowAddForm(true)}
+            onClick={() => onNavigate('survey')}
             className="get-started-btn"
           >
             Add Your First Item

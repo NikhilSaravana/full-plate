@@ -135,9 +135,13 @@ export const MYPLATE_GOALS = {
 // System Configuration
 export const SYSTEM_CONFIG = {
   AVG_PALLET_WEIGHT: 1500, // pounds
-  TARGET_CAPACITY: 900000, // pounds
+  TARGET_CAPACITY: 900000, // 900,000 lbs
   TOLERANCE_PERCENTAGE: 2,
   WEEKLY_TARGET: 715000 // pounds
+};
+
+export const updateTargetCapacity = (newCapacity) => {
+  SYSTEM_CONFIG.TARGET_CAPACITY = newCapacity;
 };
 
 // Helper function to get MyPlate category for food type

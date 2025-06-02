@@ -35,28 +35,6 @@ const ReportView = ({ currentInventory }) => {
     return scoring;
   };
 
-  const getMyPlateCompliance = () => {
-    const totalWeight = Object.values(currentInventory).reduce((sum, val) => sum + val, 0);
-    const compliance = {};
-
-    Object.entries(MYPLATE_GOALS).forEach(([category, goals]) => {
-      const currentWeight = currentInventory[category] || 0;
-      const currentPercentage = totalWeight > 0 ? (currentWeight / totalWeight) * 100 : 0;
-      const goalPercentage = goals.percentage;
-      const variance = currentPercentage - goalPercentage;
-      
-      compliance[category] = {
-        current: currentPercentage.toFixed(1),
-        goal: goalPercentage,
-        variance: variance.toFixed(1),
-        status: Math.abs(variance) <= 2 ? 'COMPLIANT' : variance > 2 ? 'OVER' : 'UNDER',
-        weight: currentWeight
-      };
-    });
-
-    return compliance;
-  };
-
   const getCapacityAnalysis = () => {
     const totalWeight = Object.values(currentInventory).reduce((sum, val) => sum + val, 0);
     const utilization = (totalWeight / SYSTEM_CONFIG.TARGET_CAPACITY) * 100;
@@ -73,29 +51,13 @@ const ReportView = ({ currentInventory }) => {
     };
   };
 
-  const generateHealthcareReport = () => {
-    const nutritional = getNutritionalScoring();
-    const compliance = getMyPlateCompliance();
-    
-    // Healthcare partnership ready metrics
-    return {
-      nutritionalQuality: parseFloat(nutritional.green.percentage) + parseFloat(nutritional.yellow.percentage),
-      myPlateCompliance: Object.values(compliance).filter(cat => cat.status === 'COMPLIANT').length,
-      totalCategories: Object.keys(compliance).length,
-      greenFoodPercentage: nutritional.green.percentage,
-      recommendationReady: parseFloat(nutritional.green.percentage) >= 60 // 60% green foods threshold
-    };
-  };
-
   const exportReport = () => {
     const reportData = {
       generatedDate: new Date().toISOString(),
       reportType,
       dateRange,
       nutritionalScoring: getNutritionalScoring(),
-      myPlateCompliance: getMyPlateCompliance(),
       capacityAnalysis: getCapacityAnalysis(),
-      healthcareMetrics: generateHealthcareReport(),
       currentInventory
     };
 
@@ -111,9 +73,7 @@ const ReportView = ({ currentInventory }) => {
   };
 
   const nutritionalScoring = getNutritionalScoring();
-  const myPlateCompliance = getMyPlateCompliance();
   const capacityAnalysis = getCapacityAnalysis();
-  const healthcareReport = generateHealthcareReport();
 
   return (
     <div className="report-view">
@@ -126,9 +86,7 @@ const ReportView = ({ currentInventory }) => {
             className="report-selector"
           >
             <option value="nutritional">Nutritional Quality Report</option>
-            <option value="myplate">MyPlate Compliance Report</option>
             <option value="capacity">Capacity Analysis</option>
-            <option value="healthcare">Healthcare Partnership Report</option>
           </select>
           <select 
             value={dateRange} 
@@ -187,53 +145,15 @@ const ReportView = ({ currentInventory }) => {
               }
               {parseFloat(nutritionalScoring.red.percentage) > 20 && 
                 <li className="recommendation warning">
-                  ⚠️ Reduce processed/miscellaneous foods to meet healthcare standards
+                  ⚠️ Reduce processed/miscellaneous foods
                 </li>
               }
               {parseFloat(nutritionalScoring.green.percentage) >= 40 && 
                 <li className="recommendation success">
-                  ✅ Good nutritional quality - suitable for healthcare partnerships
+                  ✅ Good nutritional quality
                 </li>
               }
             </ul>
-          </div>
-        </div>
-      )}
-
-      {reportType === 'myplate' && (
-        <div className="myplate-report">
-          <h3>MyPlate Compliance Analysis</h3>
-          <div className="compliance-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th>Current %</th>
-                  <th>Goal %</th>
-                  <th>Variance</th>
-                  <th>Status</th>
-                  <th>Weight (lbs)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(myPlateCompliance).map(([category, data]) => (
-                  <tr key={category} className={`status-${data.status.toLowerCase()}`}>
-                    <td className="category-name">{category}</td>
-                    <td>{data.current}%</td>
-                    <td>{data.goal}%</td>
-                    <td className={parseFloat(data.variance) > 0 ? 'positive' : 'negative'}>
-                      {data.variance > 0 ? '+' : ''}{data.variance}%
-                    </td>
-                    <td>
-                      <span className={`status-badge ${data.status.toLowerCase()}`}>
-                        {data.status}
-                      </span>
-                    </td>
-                    <td>{data.weight.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       )}
@@ -266,71 +186,6 @@ const ReportView = ({ currentInventory }) => {
               <h4>Pallet Usage</h4>
               <p className="big-number">{capacityAnalysis.currentPallets}</p>
               <p>of {capacityAnalysis.targetPallets} total pallets</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {reportType === 'healthcare' && (
-        <div className="healthcare-report">
-          <h3>Healthcare Partnership Readiness Report</h3>
-          <p className="report-description">
-            Assessment of food quality standards for healthcare provider partnerships and potential Medicaid reimbursement programs.
-          </p>
-          
-          <div className="healthcare-metrics">
-            <div className="metric-card">
-              <h4>Nutritional Quality Score</h4>
-              <p className="big-number">{healthcareReport.nutritionalQuality.toFixed(1)}%</p>
-              <p>Green + Yellow foods</p>
-              <div className={`status-indicator ${healthcareReport.nutritionalQuality >= 80 ? 'good' : 'needs-improvement'}`}>
-                {healthcareReport.nutritionalQuality >= 80 ? '✅ Healthcare Ready' : '⚠️ Needs Improvement'}
-              </div>
-            </div>
-            
-            <div className="metric-card">
-              <h4>MyPlate Compliance</h4>
-              <p className="big-number">{healthcareReport.myPlateCompliance}/{healthcareReport.totalCategories}</p>
-              <p>categories compliant</p>
-              <div className={`status-indicator ${healthcareReport.myPlateCompliance >= 5 ? 'good' : 'needs-improvement'}`}>
-                {healthcareReport.myPlateCompliance >= 5 ? '✅ Standards Met' : '⚠️ Standards Not Met'}
-              </div>
-            </div>
-            
-            <div className="metric-card">
-              <h4>Green Food Percentage</h4>
-              <p className="big-number">{healthcareReport.greenFoodPercentage}%</p>
-              <p>highly nutritious foods</p>
-              <div className={`status-indicator ${healthcareReport.recommendationReady ? 'good' : 'needs-improvement'}`}>
-                {healthcareReport.recommendationReady ? '✅ Referral Ready' : '⚠️ Not Referral Ready'}
-              </div>
-            </div>
-          </div>
-
-          <div className="healthcare-recommendations">
-            <h4>Healthcare Partnership Recommendations</h4>
-            <div className="recommendations-list">
-              {healthcareReport.recommendationReady ? (
-                <div className="recommendation success">
-                  <strong>✅ Ready for Healthcare Partnerships</strong>
-                  <p>Your food inventory meets quality standards for healthcare provider referrals and potential Medicaid reimbursement programs.</p>
-                </div>
-              ) : (
-                <div className="recommendation warning">
-                  <strong>⚠️ Improvement Needed for Healthcare Partnerships</strong>
-                  <p>Increase fresh produce and reduce processed foods to meet healthcare standards.</p>
-                </div>
-              )}
-              
-              <div className="action-items">
-                <h5>Next Steps:</h5>
-                <ul>
-                  <li>Maintain detailed nutritional tracking records</li>
-                  <li>Document food sourcing and safety protocols</li>
-                  <li>Establish relationships with local healthcare providers</li>
-                  <li>Consider implementing digital ordering system for clients</li>
-                </ul>
-              </div>
             </div>
           </div>
         </div>

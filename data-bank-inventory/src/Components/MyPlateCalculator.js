@@ -1,13 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { MYPLATE_GOALS, SYSTEM_CONFIG, getCategoryStatus, getMyPlateCategory } from './FoodCategoryMapper';
+import { MYPLATE_GOALS, SYSTEM_CONFIG, getCategoryStatus, getMyPlateCategory, updateTargetCapacity } from './FoodCategoryMapper';
 
 const MyPlateCalculator = ({ currentInventory = {} }) => {
   const [calculations, setCalculations] = useState({});
   const [summary, setSummary] = useState({});
+  const [isEditingCapacity, setIsEditingCapacity] = useState(false);
+  const [newCapacity, setNewCapacity] = useState(SYSTEM_CONFIG.TARGET_CAPACITY);
 
   useEffect(() => {
     calculateMyPlateBalance();
   }, [currentInventory]);
+
+  const handleCapacityEdit = () => {
+    if (isEditingCapacity) {
+      updateTargetCapacity(Number(newCapacity));
+      calculateMyPlateBalance();
+    }
+    setIsEditingCapacity(!isEditingCapacity);
+  };
+
+  const handleCapacityChange = (e) => {
+    const value = e.target.value;
+    if (!isNaN(value) && value >= 0) {
+      setNewCapacity(Number(value));
+    }
+  };
 
   const calculateMyPlateBalance = () => {
     // Calculate totals by MyPlate category
@@ -78,9 +95,25 @@ const MyPlateCalculator = ({ currentInventory = {} }) => {
             <label>Total Current Inventory:</label>
             <span>{summary.totalCurrent?.toLocaleString()} lbs</span>
           </div>
-          <div className="stat-item">
+          <div className="stat-item target-capacity">
             <label>Target Capacity:</label>
-            <span>{summary.targetCapacity?.toLocaleString()} lbs</span>
+            {isEditingCapacity ? (
+              <div className="capacity-edit">
+                <input
+                  type="number"
+                  value={newCapacity}
+                  onChange={handleCapacityChange}
+                  min="0"
+                  step="1000"
+                /> lbs
+                <button onClick={handleCapacityEdit} className="save-btn">Save</button>
+              </div>
+            ) : (
+              <div className="capacity-display">
+                <span>{summary.targetCapacity?.toLocaleString()} lbs</span>
+                <button onClick={handleCapacityEdit} className="edit-btn">Edit</button>
+              </div>
+            )}
           </div>
           <div className="stat-item">
             <label>Capacity Utilization:</label>

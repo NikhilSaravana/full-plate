@@ -2484,3 +2484,220 @@
 .add-detailed-btn:hover {
   background: #138496;
 }
+
+.stat-item.target-capacity {
+  position: relative;
+}
+
+.capacity-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.capacity-edit input {
+  width: 120px;
+  padding: 4px 8px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 1em;
+  color: #495057;
+}
+
+.capacity-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-btn, .save-btn {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.edit-btn {
+  background-color: #e9ecef;
+  color: #495057;
+}
+
+.save-btn {
+  background-color: #2c5aa0;
+  color: white;
+}
+
+.edit-btn:hover {
+  background-color: #dee2e6;
+}
+
+.save-btn:hover {
+  background-color: #224785;
+}
+
+/* Distribution Interface Styles */
+.distribution-interface {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.distribution-interface h2 {
+  color: #2c5aa0;
+  margin-bottom: 24px;
+}
+
+.distribution-interface .form-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+}
+
+.distribution-interface .form-section {
+  margin-bottom: 32px;
+}
+
+.distribution-interface .form-section h3 {
+  color: #2c5aa0;
+  margin-bottom: 16px;
+  font-size: 1.2em;
+}
+
+.distribution-interface .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.distribution-interface .form-field {
+  margin-bottom: 16px;
+}
+
+.distribution-interface .form-field label {
+  display: block;
+  margin-bottom: 8px;
+  color: #495057;
+  font-weight: 500;
+}
+
+.distribution-interface .form-field input,
+.distribution-interface .form-field select,
+.distribution-interface .form-field textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 1em;
+  color: #495057;
+}
+
+.distribution-interface .quick-add {
+  margin-bottom: 24px;
+}
+
+.distribution-interface .quick-add p {
+  margin-bottom: 8px;
+  color: #495057;
+  font-weight: 500;
+}
+
+.distribution-interface .quick-add-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.distribution-interface .quick-add-btn {
+  background-color: #e9ecef;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  color: #495057;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.distribution-interface .quick-add-btn:hover {
+  background-color: #dee2e6;
+}
+
+.distribution-interface .item-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.distribution-interface .item-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 2fr;
+  gap: 12px;
+  flex-grow: 1;
+}
+
+.distribution-interface .item-preview {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  color: #6c757d;
+  font-size: 0.9em;
+  margin-top: 8px;
+}
+
+.distribution-interface .remove-item-btn {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  font-size: 1.2em;
+  padding: 4px 8px;
+}
+
+.distribution-interface .add-item-btn {
+  background-color: #2c5aa0;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 16px;
+  transition: background-color 0.2s;
+}
+
+.distribution-interface .add-item-btn:hover {
+  background-color: #224785;
+}
+
+.distribution-interface .distribution-summary {
+  margin-top: 24px;
+  padding: 16px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+}
+
+.distribution-interface .distribution-summary p {
+  margin: 8px 0;
+  color: #495057;
+}
+
+.distribution-interface .submit-btn {
+  background-color: #2c5aa0;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 1.1em;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.distribution-interface .submit-btn:hover {
+  background-color: #224785;
+}
