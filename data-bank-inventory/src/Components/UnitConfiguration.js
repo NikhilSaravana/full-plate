@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-// Default unit configurations based on industry standards
+// Simplified unit configurations - only Pallet, Case, and Pounds
 const DEFAULT_UNIT_CONFIGS = {
   PALLET: {
     name: 'Pallet',
@@ -30,34 +30,6 @@ const DEFAULT_UNIT_CONFIGS = {
       'MISC': 25
     }
   },
-  BOX: {
-    name: 'Box',
-    abbreviation: 'BX',
-    baseWeight: 15,
-    categorySpecific: {
-      'DAIRY': 18,
-      'GRAIN': 12,
-      'PROTEIN': 20,
-      'FRUIT': 15,
-      'VEG': 16,
-      'PRODUCE': 14,
-      'MISC': 15
-    }
-  },
-  BAG: {
-    name: 'Bag',
-    abbreviation: 'BG',
-    baseWeight: 5,
-    categorySpecific: {
-      'DAIRY': 8,
-      'GRAIN': 3,
-      'PROTEIN': 6,
-      'FRUIT': 4,
-      'VEG': 5,
-      'PRODUCE': 3,
-      'MISC': 5
-    }
-  },
   POUNDS: {
     name: 'Pounds',
     abbreviation: 'LB',
@@ -66,35 +38,73 @@ const DEFAULT_UNIT_CONFIGS = {
   }
 };
 
-const UnitConfiguration = ({ onConfigUpdate }) => {
-  const [unitConfigs, setUnitConfigs] = useState(DEFAULT_UNIT_CONFIGS);
+const UnitConfiguration = ({ onConfigurationChange }) => {
+  const [configurations, setConfigurations] = useState({
+    PALLET: {
+      baseWeight: 2000,
+      categorySpecific: {
+        'Canned Goods': 2200,
+        'Dry Goods': 1800,
+        'Fresh Produce': 1500,
+        'Dairy': 1600,
+        'Meat': 1700,
+        'Bakery': 1400
+      }
+    },
+    CASE: {
+      baseWeight: 50,
+      categorySpecific: {
+        'Canned Goods': 60,
+        'Dry Goods': 45,
+        'Fresh Produce': 40,
+        'Dairy': 35,
+        'Meat': 55,
+        'Bakery': 30
+      }
+    },
+    POUNDS: {
+      baseWeight: 1,
+      categorySpecific: {}
+    }
+  });
+
   const [selectedUnit, setSelectedUnit] = useState('PALLET');
   const [isEditing, setIsEditing] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
 
+  // Load configurations from localStorage on startup
   useEffect(() => {
-    // Load saved configurations from localStorage
-    const savedConfigs = localStorage.getItem('unitConfigurations');
-    if (savedConfigs) {
-      setUnitConfigs(JSON.parse(savedConfigs));
+    try {
+      const saved = localStorage.getItem('unitConfigurations');
+      if (saved) {
+        const parsedConfigs = JSON.parse(saved);
+        setConfigurations(parsedConfigs);
+      }
+    } catch (error) {
+      console.error('Error loading unit configurations:', error);
     }
   }, []);
 
+  // Save configurations and notify parent when they change
   useEffect(() => {
-    // Notify parent component of configuration updates
-    if (onConfigUpdate) {
-      onConfigUpdate(unitConfigs);
+    try {
+      localStorage.setItem('unitConfigurations', JSON.stringify(configurations));
+      if (onConfigurationChange) {
+        onConfigurationChange(configurations);
+      }
+    } catch (error) {
+      console.error('Error saving unit configurations:', error);
     }
-  }, [unitConfigs, onConfigUpdate]);
+  }, [configurations, onConfigurationChange]);
 
   const saveConfigurations = () => {
-    localStorage.setItem('unitConfigurations', JSON.stringify(unitConfigs));
+    localStorage.setItem('unitConfigurations', JSON.stringify(configurations));
     setIsEditing(false);
     setEditingCategory(null);
   };
 
   const updateUnitWeight = (unitType, category, newWeight) => {
-    setUnitConfigs(prev => ({
+    setConfigurations(prev => ({
       ...prev,
       [unitType]: {
         ...prev[unitType],
@@ -106,12 +116,12 @@ const UnitConfiguration = ({ onConfigUpdate }) => {
   };
 
   const resetToDefaults = () => {
-    setUnitConfigs(DEFAULT_UNIT_CONFIGS);
+    setConfigurations(DEFAULT_UNIT_CONFIGS);
     localStorage.removeItem('unitConfigurations');
   };
 
   const getEffectiveWeight = (unitType, category = null) => {
-    const config = unitConfigs[unitType];
+    const config = configurations[unitType];
     if (!config) return 1;
     
     if (category && config.categorySpecific[category]) {
@@ -152,33 +162,33 @@ const UnitConfiguration = ({ onConfigUpdate }) => {
       </div>
 
       <div className="unit-tabs">
-        {Object.keys(unitConfigs).map(unitType => (
+        {Object.keys(configurations).map(unitType => (
           <button
             key={unitType}
             className={`unit-tab ${selectedUnit === unitType ? 'active' : ''}`}
             onClick={() => setSelectedUnit(unitType)}
           >
-            {unitConfigs[unitType].name} ({unitConfigs[unitType].abbreviation})
+            {configurations[unitType].name} ({configurations[unitType].abbreviation})
           </button>
         ))}
       </div>
 
       <div className="unit-details">
         <div className="unit-overview">
-          <h3>{unitConfigs[selectedUnit].name} Configuration</h3>
+          <h3>{configurations[selectedUnit].name} Configuration</h3>
           <div className="base-weight-config">
             <label>Base Weight (Default):</label>
             {isEditing ? (
               <input
                 type="number"
                 step="0.1"
-                value={unitConfigs[selectedUnit].baseWeight}
+                value={configurations[selectedUnit].baseWeight}
                 onChange={(e) => updateUnitWeight(selectedUnit, null, e.target.value)}
                 className="weight-input"
               />
             ) : (
               <span className="weight-display">
-                {unitConfigs[selectedUnit].baseWeight} lbs
+                {configurations[selectedUnit].baseWeight} lbs
               </span>
             )}
           </div>
@@ -187,7 +197,7 @@ const UnitConfiguration = ({ onConfigUpdate }) => {
         <div className="category-specific-weights">
           <h4>Category-Specific Weights</h4>
           <div className="category-weights-grid">
-            {Object.entries(unitConfigs[selectedUnit].categorySpecific).map(([category, weight]) => (
+            {Object.entries(configurations[selectedUnit].categorySpecific).map(([category, weight]) => (
               <div key={category} className="category-weight-item">
                 <label>{category}:</label>
                 {isEditing ? (
@@ -209,13 +219,13 @@ const UnitConfiguration = ({ onConfigUpdate }) => {
         <div className="conversion-examples">
           <h4>Conversion Examples</h4>
           <div className="examples-grid">
-            {Object.keys(unitConfigs[selectedUnit].categorySpecific).map(category => {
+            {Object.keys(configurations[selectedUnit].categorySpecific).map(category => {
               const weight = getEffectiveWeight(selectedUnit, category);
               return (
                 <div key={category} className="example-item">
                   <span className="category-name">{category}:</span>
                   <span className="conversion">
-                    1 {unitConfigs[selectedUnit].abbreviation} = {weight} lbs
+                    1 {configurations[selectedUnit].abbreviation} = {weight} lbs
                   </span>
                 </div>
               );
@@ -238,7 +248,7 @@ const UnitConfiguration = ({ onConfigUpdate }) => {
             onChange={(e) => setSelectedUnit(e.target.value)}
             className="unit-select"
           >
-            {Object.entries(unitConfigs).map(([key, config]) => (
+            {Object.entries(configurations).map(([key, config]) => (
               <option key={key} value={key}>
                 {config.name} ({config.abbreviation})
               </option>
@@ -246,7 +256,7 @@ const UnitConfiguration = ({ onConfigUpdate }) => {
           </select>
           <select className="category-select" id="converter-category">
             <option value="">Default Weight</option>
-            {Object.keys(unitConfigs[selectedUnit].categorySpecific).map(category => (
+            {Object.keys(configurations[selectedUnit].categorySpecific).map(category => (
               <option key={category} value={category}>{category}</option>
             ))}
           </select>
@@ -257,7 +267,7 @@ const UnitConfiguration = ({ onConfigUpdate }) => {
               const category = document.getElementById('converter-category').value;
               if (quantity) {
                 const result = convertToStandardWeight(parseFloat(quantity), selectedUnit, category || null);
-                alert(`${quantity} ${unitConfigs[selectedUnit].abbreviation} = ${result} lbs`);
+                alert(`${quantity} ${configurations[selectedUnit].abbreviation} = ${result} lbs`);
               }
             }}
           >

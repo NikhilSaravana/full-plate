@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import MyPlateCalculator from './MyPlateCalculator';
 import InventoryManager from './InventoryManager';
-import OrderingSystem from './OrderingSystem';
 import SurveyInterface from './SurveyInterface';
 import DistributionInterface from './DistributionInterface';
-import ReportView from './ReportView';
 import UnitConfiguration from './UnitConfiguration';
+import firestoreService from '../services/firestoreService';
 
 const Dashboard = () => {
+  const { currentUser, logout } = useAuth();
+
   // Real inventory state that starts empty and gets populated by user data
   const [currentInventory, setCurrentInventory] = useState({
     'DAIRY': 0,
@@ -20,77 +22,554 @@ const Dashboard = () => {
   });
 
   const [activeTab, setActiveTab] = useState('overview');
+  const [activeOverviewSection, setActiveOverviewSection] = useState('dashboard');
   const [recentActivity, setRecentActivity] = useState([]);
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [autoSaveStatus, setAutoSaveStatus] = useState('');
 
-  // Load data from localStorage on startup
+  // Enhanced Distribution Tracking
+  const [distributionHistory, setDistributionHistory] = useState([]);
+  const [outgoingMetrics, setOutgoingMetrics] = useState({
+    totalDistributedToday: 0,
+    totalDistributedWeek: 0,
+    clientsServedToday: 0,
+    avgDistributionSize: 0
+  });
+
+  // Unit Toggle System for ordering calculations
+  const [orderingUnit, setOrderingUnit] = useState('pounds'); // 'pounds', 'cases', 'pallets'
+  const [unitConfigurations, setUnitConfigurations] = useState(null);
+
+  // Enhanced Local Storage Management
+  const [storageStatus, setStorageStatus] = useState('healthy');
+  const [lastBackupTime, setLastBackupTime] = useState(null);
+
+  // Firebase Integration State
+  const [syncStatus, setSyncStatus] = useState('disconnected'); // 'connected', 'syncing', 'error', 'disconnected'
+  const [connectionStatus, setConnectionStatus] = useState({ connected: false });
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [pendingChanges, setPendingChanges] = useState(false);
+
+  // Enhanced data validation and error handling
+  const validateData = (data, type) => {
+    try {
+      if (!data) return false;
+      
+      switch (type) {
+        case 'inventory':
+          return typeof data === 'object' && 
+                 Object.keys(data).every(key => typeof data[key] === 'number');
+        case 'activity':
+          return Array.isArray(data) && 
+                 data.every(item => item.timestamp && item.message);
+        case 'distributions':
+          return Array.isArray(data) && 
+                 data.every(item => item.totalDistributed && item.date);
+        default:
+          return true;
+      }
+    } catch (error) {
+      console.error(`Data validation failed for ${type}:`, error);
+      return false;
+    }
+  };
+
+  // Enhanced localStorage operations with error handling
+  const safeLocalStorageGet = (key, defaultValue = null) => {
+    try {
+      const item = localStorage.getItem(key);
+      if (!item) return defaultValue;
+      
+      const parsed = JSON.parse(item);
+      return parsed;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      setStorageStatus('error');
+      return defaultValue;
+    }
+  };
+
+  const safeLocalStorageSet = (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      setStorageStatus('healthy');
+      return true;
+    } catch (error) {
+      console.error(`Error saving ${key} to localStorage:`, error);
+      setStorageStatus('error');
+      
+      // Try to free up space by removing old data
+      if (error.name === 'QuotaExceededError') {
+        cleanupOldData();
+        // Try again after cleanup
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+          setStorageStatus('healthy');
+          return true;
+        } catch (retryError) {
+          console.error('Failed to save even after cleanup:', retryError);
+          return false;
+        }
+      }
+      return false;
+    }
+  };
+
+  // Cleanup old data to free up localStorage space
+  const cleanupOldData = () => {
+    try {
+      // Remove old activity entries (keep only last 50)
+      const activity = safeLocalStorageGet('foodBankActivity', []);
+      if (activity.length > 50) {
+        const trimmedActivity = activity.slice(0, 50);
+        safeLocalStorageSet('foodBankActivity', trimmedActivity);
+      }
+
+      // Remove old distribution entries (keep only last 100)
+      const distributions = safeLocalStorageGet('distributionHistory', []);
+      if (distributions.length > 100) {
+        const trimmedDistributions = distributions.slice(0, 100);
+        safeLocalStorageSet('distributionHistory', trimmedDistributions);
+      }
+
+      console.log('Old data cleaned up to free storage space');
+    } catch (error) {
+      console.error('Error during cleanup:', error);
+    }
+  };
+
+  // Auto-backup functionality
+  const createAutoBackup = () => {
+    try {
+      const backupData = {
+        inventory: currentInventory,
+        activity: recentActivity,
+        distributions: distributionHistory,
+        unitConfigurations: unitConfigurations,
+        orderingUnit: orderingUnit,
+        timestamp: new Date().toISOString(),
+        version: '2.0'
+      };
+
+      const backupKey = `backup_${Date.now()}`;
+      safeLocalStorageSet(backupKey, backupData);
+      setLastBackupTime(new Date());
+
+      // Keep only last 5 backups
+      const allKeys = Object.keys(localStorage);
+      const backupKeys = allKeys.filter(key => key.startsWith('backup_')).sort();
+      if (backupKeys.length > 5) {
+        const keysToRemove = backupKeys.slice(0, backupKeys.length - 5);
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+      }
+
+      console.log('Auto-backup created successfully');
+    } catch (error) {
+      console.error('Auto-backup failed:', error);
+    }
+  };
+
+  // Auto-backup every 10 minutes
+  useEffect(() => {
+    const backupInterval = setInterval(createAutoBackup, 10 * 60 * 1000);
+    return () => clearInterval(backupInterval);
+  }, [currentInventory, recentActivity, distributionHistory]);
+
+  // Firebase Integration and Real-time Sync
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let inventoryUnsubscribe;
+    let distributionsUnsubscribe;
+    let connectionUnsubscribe;
+
+    const setupFirebaseSync = async () => {
+      try {
+        setSyncStatus('connecting');
+
+        // Monitor connection status
+        connectionUnsubscribe = firestoreService.onConnectionStateChange((status) => {
+          setConnectionStatus(status);
+          if (status.connected) {
+            setSyncStatus('connected');
+            syncPendingChanges();
+          } else {
+            setSyncStatus('disconnected');
+          }
+        });
+
+        // Subscribe to real-time inventory updates
+        inventoryUnsubscribe = firestoreService.subscribeToInventory(
+          currentUser.uid,
+          (result) => {
+            if (result.success) {
+              setCurrentInventory(result.data);
+              setLastSyncTime(result.lastUpdated);
+              setSyncStatus(result.syncStatus);
+              
+              // Update local storage as backup
+              safeLocalStorageSet('foodBankInventory', result.data);
+              
+              if (result.syncStatus === 'initialized') {
+                showAutoSaveStatus('Inventory initialized from cloud');
+              } else if (result.syncStatus === 'synced') {
+                showAutoSaveStatus('Inventory synced');
+              }
+            } else {
+              console.error('Inventory sync error:', result.error);
+              setSyncStatus('error');
+              showAutoSaveStatus('Sync error: ' + result.error, true);
+            }
+          }
+        );
+
+        // Subscribe to real-time distribution updates
+        distributionsUnsubscribe = firestoreService.subscribeToDistributions(
+          currentUser.uid,
+          (result) => {
+            if (result.success) {
+              setDistributionHistory(result.data);
+              setLastSyncTime(new Date());
+              
+              // Update local storage as backup
+              safeLocalStorageSet('distributionHistory', result.data);
+              
+              if (result.count > 0) {
+                showAutoSaveStatus(`${result.count} distributions synced`);
+              }
+            } else {
+              console.error('Distributions sync error:', result.error);
+              showAutoSaveStatus('Distribution sync error: ' + result.error, true);
+            }
+          }
+        );
+
+        // Load user preferences
+        const prefsResult = await firestoreService.getUserPreferences(currentUser.uid);
+        if (prefsResult.success) {
+          const prefs = prefsResult.data;
+          if (prefs.orderingUnit) setOrderingUnit(prefs.orderingUnit);
+          if (prefs.unitConfigurations) setUnitConfigurations(prefs.unitConfigurations);
+          
+          if (!prefsResult.isDefault) {
+            showAutoSaveStatus('Preferences loaded');
+          }
+        }
+
+      } catch (error) {
+        console.error('Firebase setup error:', error);
+        setSyncStatus('error');
+        showAutoSaveStatus('Failed to connect to cloud', true);
+      }
+    };
+
+    setupFirebaseSync();
+
+    // Cleanup subscriptions on unmount or user change
+    return () => {
+      if (inventoryUnsubscribe) inventoryUnsubscribe();
+      if (distributionsUnsubscribe) distributionsUnsubscribe();
+      if (connectionUnsubscribe) connectionUnsubscribe();
+      firestoreService.unsubscribeAll(currentUser.uid);
+    };
+  }, [currentUser]);
+
+  // Sync pending changes when connection is restored
+  const syncPendingChanges = async () => {
+    if (!currentUser || !pendingChanges) return;
+
+    try {
+      setSyncStatus('syncing');
+      
+      // Sync inventory if there are pending changes
+      const localInventory = safeLocalStorageGet('foodBankInventory');
+      if (localInventory) {
+        const result = await firestoreService.saveInventory(currentUser.uid, localInventory);
+        if (result.success) {
+          showAutoSaveStatus('Pending inventory synced');
+        }
+      }
+
+      // Sync activity
+      const localActivity = safeLocalStorageGet('foodBankActivity', []);
+      if (localActivity.length > 0) {
+        const result = await firestoreService.saveActivity(currentUser.uid, localActivity);
+        if (result.success) {
+          showAutoSaveStatus('Activity synced');
+        }
+      }
+
+      setPendingChanges(false);
+      setSyncStatus('connected');
+    } catch (error) {
+      console.error('Sync error:', error);
+      setSyncStatus('error');
+      showAutoSaveStatus('Sync failed: ' + error.message, true);
+    }
+  };
+
+  // Enhanced data saving with Firebase integration
+  const saveInventoryToCloud = async (inventoryData) => {
+    if (!currentUser) return;
+
+    try {
+      const result = await firestoreService.saveInventory(currentUser.uid, inventoryData);
+      if (result.success) {
+        setLastSyncTime(new Date());
+        showAutoSaveStatus('Inventory saved to cloud');
+      } else {
+        setPendingChanges(true);
+        showAutoSaveStatus('Saved locally (will sync when online)', false);
+      }
+    } catch (error) {
+      setPendingChanges(true);
+      console.error('Cloud save error:', error);
+    }
+  };
+
+  const saveDistributionToCloud = async (distributionData) => {
+    if (!currentUser) return;
+
+    try {
+      const result = await firestoreService.addDistribution(currentUser.uid, distributionData);
+      if (result.success) {
+        setLastSyncTime(new Date());
+        showAutoSaveStatus('Distribution saved to cloud');
+        return result.id;
+      } else {
+        setPendingChanges(true);
+        showAutoSaveStatus('Saved locally (will sync when online)', false);
+      }
+    } catch (error) {
+      setPendingChanges(true);
+      console.error('Distribution save error:', error);
+    }
+  };
+
+  const savePreferencesToCloud = async (preferences) => {
+    if (!currentUser) return;
+
+    try {
+      const result = await firestoreService.saveUserPreferences(currentUser.uid, preferences);
+      if (result.success) {
+        showAutoSaveStatus('Preferences synced');
+      }
+    } catch (error) {
+      console.error('Preferences save error:', error);
+    }
+  };
+
+  // Enhanced data loading with validation
   useEffect(() => {
     try {
-      const savedInventory = localStorage.getItem('foodBankInventory');
-      const savedActivity = localStorage.getItem('foodBankActivity');
-      const hasBeenSetup = localStorage.getItem('foodBankSetupComplete');
+      const savedInventory = safeLocalStorageGet('foodBankInventory');
+      const savedActivity = safeLocalStorageGet('foodBankActivity', []);
+      const savedDistributions = safeLocalStorageGet('distributionHistory', []);
+      const hasBeenSetup = safeLocalStorageGet('foodBankSetupComplete');
+      const savedUnitConfigs = safeLocalStorageGet('unitConfigurations');
+      const savedOrderingUnit = safeLocalStorageGet('orderingUnit', 'pounds');
 
-      if (savedInventory) {
-        setCurrentInventory(JSON.parse(savedInventory));
+      // Validate and load inventory
+      if (savedInventory && validateData(savedInventory, 'inventory')) {
+        setCurrentInventory(savedInventory);
       }
-      if (savedActivity) {
-        setRecentActivity(JSON.parse(savedActivity));
+
+      // Validate and load activity
+      if (validateData(savedActivity, 'activity')) {
+        setRecentActivity(savedActivity);
       }
+
+      // Validate and load distributions
+      if (validateData(savedDistributions, 'distributions')) {
+        setDistributionHistory(savedDistributions);
+      }
+
       if (hasBeenSetup) {
         setIsFirstTime(false);
       }
+      if (savedUnitConfigs) {
+        setUnitConfigurations(savedUnitConfigs);
+      }
+      setOrderingUnit(savedOrderingUnit);
+
+      setStorageStatus('healthy');
     } catch (error) {
       console.error('Error loading data from localStorage:', error);
+      setStorageStatus('error');
       showAutoSaveStatus('Error loading saved data', true);
     }
   }, []);
 
-  // Save data to localStorage whenever it changes
+  // Enhanced data saving with safe storage functions
   useEffect(() => {
-    try {
-      localStorage.setItem('foodBankInventory', JSON.stringify(currentInventory));
-      showAutoSaveStatus('Data saved');
-    } catch (error) {
-      console.error('Error saving inventory to localStorage:', error);
-      showAutoSaveStatus('Error saving data', true);
+    safeLocalStorageSet('foodBankInventory', currentInventory);
+    if (Object.values(currentInventory).some(val => val > 0)) {
+      showAutoSaveStatus('Inventory saved');
+      // Save to cloud if user is authenticated and connected
+      if (currentUser && connectionStatus.connected) {
+        saveInventoryToCloud(currentInventory);
+      } else if (currentUser) {
+        setPendingChanges(true);
+      }
     }
   }, [currentInventory]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('foodBankActivity', JSON.stringify(recentActivity));
+    safeLocalStorageSet('foodBankActivity', recentActivity);
       if (recentActivity.length > 0) {
-        showAutoSaveStatus('Data saved');
+      showAutoSaveStatus('Activity saved');
+      // Save to cloud if user is authenticated
+      if (currentUser && connectionStatus.connected) {
+        firestoreService.saveActivity(currentUser.uid, recentActivity);
+      } else if (currentUser) {
+        setPendingChanges(true);
       }
-    } catch (error) {
-      console.error('Error saving activity to localStorage:', error);
-      showAutoSaveStatus('Error saving data', true);
     }
   }, [recentActivity]);
+
+  // Save distribution data and update metrics
+  useEffect(() => {
+    safeLocalStorageSet('distributionHistory', distributionHistory);
+    updateOutgoingMetrics();
+  }, [distributionHistory]);
+
+  // Save ordering unit preference
+  useEffect(() => {
+    safeLocalStorageSet('orderingUnit', orderingUnit);
+    // Save preferences to cloud
+    if (currentUser && connectionStatus.connected) {
+      savePreferencesToCloud({ orderingUnit, unitConfigurations });
+    }
+  }, [orderingUnit]);
+
+  // Save unit configurations
+  useEffect(() => {
+    if (unitConfigurations) {
+      safeLocalStorageSet('unitConfigurations', unitConfigurations);
+      // Save preferences to cloud
+      if (currentUser && connectionStatus.connected) {
+        savePreferencesToCloud({ orderingUnit, unitConfigurations });
+      }
+    }
+  }, [unitConfigurations]);
+
+  const updateOutgoingMetrics = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    const todaysDistributions = distributionHistory.filter(dist => 
+      dist.date === today
+    );
+    
+    const weekDistributions = distributionHistory.filter(dist => 
+      new Date(dist.date) >= weekAgo
+    );
+
+    const totalToday = todaysDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
+    const totalWeek = weekDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
+    const clientsToday = todaysDistributions.reduce((sum, dist) => sum + (dist.clientsServed || 0), 0);
+    const avgSize = distributionHistory.length > 0 
+      ? distributionHistory.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0) / distributionHistory.length 
+      : 0;
+
+    setOutgoingMetrics({
+      totalDistributedToday: totalToday,
+      totalDistributedWeek: totalWeek,
+      clientsServedToday: clientsToday,
+      avgDistributionSize: avgSize
+    });
+  };
+
+  // Unit conversion functions
+  const getUnitWeight = (category, unit) => {
+    if (!unitConfigurations) return 1;
+    
+    const config = unitConfigurations[unit.toUpperCase()];
+    if (!config) return 1;
+    
+    // Check for category-specific weight first
+    if (config.categorySpecific && config.categorySpecific[category]) {
+      return config.categorySpecific[category];
+    }
+    
+    // Fall back to base weight
+    return config.baseWeight || 1;
+  };
+
+  const convertFromPounds = (weightInPounds, category, targetUnit) => {
+    if (targetUnit === 'pounds') return weightInPounds;
+    
+    const unitWeight = getUnitWeight(category, targetUnit);
+    return weightInPounds / unitWeight;
+  };
+
+  const formatInventoryValue = (weightInPounds, category) => {
+    const converted = convertFromPounds(weightInPounds, category, orderingUnit);
+    
+    if (orderingUnit === 'pounds') {
+      return `${converted.toLocaleString()} lbs`;
+    } else if (orderingUnit === 'cases') {
+      return `${converted.toFixed(1)} cases`;
+    } else if (orderingUnit === 'pallets') {
+      return `${converted.toFixed(2)} pallets`;
+    }
+    
+    return `${converted.toLocaleString()} ${orderingUnit}`;
+  };
+
+  const getUnitAbbreviation = () => {
+    switch (orderingUnit) {
+      case 'pounds': return 'lbs';
+      case 'cases': return 'cases';
+      case 'pallets': return 'pallets';
+      default: return orderingUnit;
+    }
+  };
 
   const showAutoSaveStatus = (message, isError = false) => {
     setAutoSaveStatus({ message, isError });
     setTimeout(() => setAutoSaveStatus(''), 1500);
   };
 
-  const exportAllData = () => {
+  // Enhanced export with Firebase data
+  const exportAllData = async () => {
     try {
-      const allData = {
+      setAutoSaveStatus({ message: 'Preparing export...', isError: false });
+      
+      let exportData = {
         inventory: currentInventory,
         activity: recentActivity,
-        detailedInventory: JSON.parse(localStorage.getItem('detailedInventory') || '{}'),
-        unitConfigurations: JSON.parse(localStorage.getItem('unitConfigurations') || '{}'),
-        orderHistory: JSON.parse(localStorage.getItem('orderHistory') || '[]'),
-        customOrders: JSON.parse(localStorage.getItem('customOrders') || '{}'),
-        projectionMode: localStorage.getItem('projectionMode') || 'weekly',
-        weeklyDistribution: localStorage.getItem('weeklyDistribution') || '50000',
-        setupComplete: localStorage.getItem('foodBankSetupComplete') || 'false',
+        distributions: distributionHistory,
+        unitConfigurations: unitConfigurations,
+        orderingUnit: orderingUnit,
+        detailedInventory: safeLocalStorageGet('detailedInventory', {}),
+        setupComplete: safeLocalStorageGet('foodBankSetupComplete', 'false'),
         exportDate: new Date().toISOString(),
-        version: '1.0'
+        version: '2.0',
+        source: 'local'
       };
 
-      const dataStr = JSON.stringify(allData, null, 2);
+      // If user is authenticated, try to get cloud data
+      if (currentUser && connectionStatus.connected) {
+        try {
+          const cloudData = await firestoreService.exportUserData(currentUser.uid);
+          if (cloudData.success) {
+            exportData = {
+              ...exportData,
+              ...cloudData.data,
+              source: 'cloud',
+              cloudExportDate: cloudData.data.exportDate
+            };
+            setAutoSaveStatus({ message: 'Cloud data included in export', isError: false });
+          }
+        } catch (error) {
+          console.warn('Could not include cloud data in export:', error);
+          setAutoSaveStatus({ message: 'Export using local data only', isError: false });
+        }
+      }
+
+      const dataStr = JSON.stringify(exportData, null, 2);
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
       
       const exportFileDefaultName = `food-bank-backup-${new Date().toISOString().split('T')[0]}.json`;
@@ -100,61 +579,65 @@ const Dashboard = () => {
       linkElement.setAttribute('download', exportFileDefaultName);
       linkElement.click();
 
-      showAutoSaveStatus('Backup exported');
+      showAutoSaveStatus('Backup exported successfully');
     } catch (error) {
       console.error('Error exporting data:', error);
-      showAutoSaveStatus('Export failed', true);
+      showAutoSaveStatus('Export failed: ' + error.message, true);
     }
   };
 
-  const importData = (event) => {
+  // Enhanced import with Firebase integration
+  const importData = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const importedData = JSON.parse(e.target.result);
         
         if (window.confirm('This will replace ALL current data. Are you sure you want to continue?')) {
-          // Restore all data
+          setAutoSaveStatus({ message: 'Importing data...', isError: false });
+
+          // Import to local storage first
           if (importedData.inventory) setCurrentInventory(importedData.inventory);
           if (importedData.activity) setRecentActivity(importedData.activity);
+          if (importedData.distributions) setDistributionHistory(importedData.distributions);
+          if (importedData.unitConfigurations) setUnitConfigurations(importedData.unitConfigurations);
+          if (importedData.orderingUnit) setOrderingUnit(importedData.orderingUnit);
           
           // Restore localStorage data
           if (importedData.detailedInventory) {
-            localStorage.setItem('detailedInventory', JSON.stringify(importedData.detailedInventory));
-          }
-          if (importedData.unitConfigurations) {
-            localStorage.setItem('unitConfigurations', JSON.stringify(importedData.unitConfigurations));
-          }
-          if (importedData.orderHistory) {
-            localStorage.setItem('orderHistory', JSON.stringify(importedData.orderHistory));
-          }
-          if (importedData.customOrders) {
-            localStorage.setItem('customOrders', JSON.stringify(importedData.customOrders));
-          }
-          if (importedData.projectionMode) {
-            localStorage.setItem('projectionMode', importedData.projectionMode);
-          }
-          if (importedData.weeklyDistribution) {
-            localStorage.setItem('weeklyDistribution', importedData.weeklyDistribution);
+            safeLocalStorageSet('detailedInventory', importedData.detailedInventory);
           }
           if (importedData.setupComplete) {
-            localStorage.setItem('foodBankSetupComplete', importedData.setupComplete);
+            safeLocalStorageSet('foodBankSetupComplete', importedData.setupComplete);
             setIsFirstTime(importedData.setupComplete !== 'true');
           }
 
-          showAutoSaveStatus('Data imported successfully');
-          
-          // Refresh the page to ensure all components reload with new data
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
+          // Import to cloud if user is authenticated
+          if (currentUser && connectionStatus.connected) {
+            try {
+              const cloudImport = await firestoreService.importUserData(currentUser.uid, importedData);
+              if (cloudImport.success) {
+                showAutoSaveStatus('Data imported to cloud successfully');
+              } else {
+                showAutoSaveStatus('Local import successful, cloud sync pending', false);
+                setPendingChanges(true);
+              }
+            } catch (error) {
+              console.error('Cloud import error:', error);
+              showAutoSaveStatus('Local import successful, cloud sync failed', false);
+              setPendingChanges(true);
+            }
+          } else {
+            showAutoSaveStatus('Data imported locally');
+            if (currentUser) setPendingChanges(true);
+          }
         }
       } catch (error) {
         console.error('Error importing data:', error);
-        showAutoSaveStatus('Import failed - invalid file', true);
+        showAutoSaveStatus('Import failed - invalid file format', true);
       }
     };
     reader.readAsText(file);
@@ -163,7 +646,91 @@ const Dashboard = () => {
     event.target.value = '';
   };
 
-  const handleSurveySubmit = (surveyData) => {
+  // Performance optimization: Memoized calculations
+  const memoizedTotalInventory = React.useMemo(() => {
+    return Object.values(currentInventory).reduce((sum, val) => sum + val, 0);
+  }, [currentInventory]);
+
+  const memoizedMyPlateCompliance = React.useMemo(() => {
+    const total = memoizedTotalInventory;
+    if (total === 0) return 'No data yet';
+
+    const vegPercentage = (currentInventory.VEG / total) * 100;
+    const fruitPercentage = (currentInventory.FRUIT / total) * 100;
+    const proteinPercentage = (currentInventory.PROTEIN / total) * 100;
+    const dairyPercentage = (currentInventory.DAIRY / total) * 100;
+    const grainPercentage = (currentInventory.GRAIN / total) * 100;
+    
+    const vegOK = vegPercentage >= 13 && vegPercentage <= 17;
+    const fruitOK = fruitPercentage >= 13 && fruitPercentage <= 17;
+    const proteinOK = proteinPercentage >= 18 && proteinPercentage <= 22;
+    const dairyOK = dairyPercentage >= 2 && dairyPercentage <= 4;
+    const grainOK = grainPercentage >= 13 && grainPercentage <= 17;
+    
+    const compliantCategories = [vegOK, fruitOK, proteinOK, dairyOK, grainOK].filter(Boolean).length;
+    return `${compliantCategories}/5 Categories Compliant`;
+  }, [currentInventory, memoizedTotalInventory]);
+
+  // System health check
+  const performSystemHealthCheck = () => {
+    const healthReport = {
+      timestamp: new Date().toISOString(),
+      localStorage: {
+        available: typeof(Storage) !== "undefined",
+        usage: 0,
+        errors: []
+      },
+      firebase: {
+        connected: connectionStatus.connected,
+        syncStatus: syncStatus,
+        lastSync: lastSyncTime,
+        pendingChanges: pendingChanges
+      },
+      data: {
+        inventoryItems: Object.keys(currentInventory).length,
+        totalWeight: memoizedTotalInventory,
+        distributionCount: distributionHistory.length,
+        activityCount: recentActivity.length
+      },
+      performance: {
+        renderTime: performance.now(),
+        memoryUsage: performance.memory ? {
+          used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+          total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+          limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
+        } : 'Not available'
+      }
+    };
+
+    // Check localStorage usage
+    try {
+      let totalSize = 0;
+      for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          totalSize += localStorage[key].length;
+        }
+      }
+      healthReport.localStorage.usage = Math.round(totalSize / 1024); // KB
+    } catch (error) {
+      healthReport.localStorage.errors.push(error.message);
+    }
+
+    console.log('System Health Report:', healthReport);
+    
+    // Show summary to user
+    const summary = `
+System Health Check:
+• Storage: ${healthReport.localStorage.available ? 'Available' : 'Unavailable'} (${healthReport.localStorage.usage}KB used)
+• Firebase: ${healthReport.firebase.connected ? 'Connected' : 'Disconnected'} (${healthReport.firebase.syncStatus})
+• Data: ${healthReport.data.inventoryItems} categories, ${healthReport.data.distributionCount} distributions
+• Performance: ${healthReport.performance.memoryUsage !== 'Not available' ? healthReport.performance.memoryUsage.used + 'MB used' : 'Memory info unavailable'}
+    `;
+    
+    alert(summary);
+    return healthReport;
+  };
+
+  const handleSurveySubmit = async (surveyData) => {
     console.log('Survey data received:', surveyData);
     
     // Update inventory based on survey data
@@ -190,34 +757,77 @@ const Dashboard = () => {
       ? `Distributed ${surveyData.totalDistributed.toFixed(1)} lbs to ${surveyData.clientsServed || '?'} clients (${surveyData.recipient})`
       : `Added ${surveyData.items?.length || 0} items from ${surveyData.source}`;
 
-    setRecentActivity(prev => [{
+    const newActivity = {
       type: surveyData.type,
       message: activityMessage,
       time: 'Just now',
       timestamp: new Date().toISOString()
-    }, ...prev.slice(0, 19)]); // Keep last 20 activities
+    };
+
+    setRecentActivity(prev => [newActivity, ...prev.slice(0, 19)]); // Keep last 20 activities
+
+    // Handle distribution tracking
+    if (surveyData.type === 'DISTRIBUTION') {
+      const distributionRecord = {
+        date: new Date().toISOString().split('T')[0],
+        recipient: surveyData.recipient || 'Unknown',
+        totalDistributed: surveyData.totalDistributed || 0,
+        clientsServed: surveyData.clientsServed || 0,
+        categoryTotals: surveyData.categoryTotals || {},
+        items: surveyData.items || [],
+        notes: surveyData.notes || '',
+        timestamp: new Date().toISOString()
+      };
+
+      // Add to local distribution history
+      setDistributionHistory(prev => [distributionRecord, ...prev]);
+
+      // Save to cloud if connected
+      if (currentUser && connectionStatus.connected) {
+        try {
+          const cloudId = await saveDistributionToCloud(distributionRecord);
+          if (cloudId) {
+            // Update local record with cloud ID
+            setDistributionHistory(prev => 
+              prev.map((dist, index) => 
+                index === 0 ? { ...dist, id: cloudId } : dist
+              )
+            );
+          }
+        } catch (error) {
+          console.error('Failed to save distribution to cloud:', error);
+          setPendingChanges(true);
+        }
+      } else if (currentUser) {
+        setPendingChanges(true);
+      }
+    }
 
     // Mark as no longer first time
     if (isFirstTime) {
       setIsFirstTime(false);
-      localStorage.setItem('foodBankSetupComplete', 'true');
+      safeLocalStorageSet('foodBankSetupComplete', 'true');
     }
   };
 
   const getTotalInventory = () => {
-    return Object.values(currentInventory).reduce((sum, val) => sum + val, 0);
+    return memoizedTotalInventory;
   };
 
   const getCapacityUtilization = () => {
-    const total = getTotalInventory();
+    const total = memoizedTotalInventory;
     // Default target capacity - could be made configurable
     const targetCapacity = 900000;
     return total > 0 ? ((total / targetCapacity) * 100).toFixed(1) : '0.0';
   };
 
   const getMyPlateCompliance = () => {
-    const total = getTotalInventory();
-    if (total === 0) return 'No data yet';
+    return memoizedMyPlateCompliance;
+  };
+
+  const getMyPlateComplianceData = () => {
+    const total = memoizedTotalInventory;
+    if (total === 0) return { compliantCategories: 0 };
 
     const vegPercentage = (currentInventory.VEG / total) * 100;
     const fruitPercentage = (currentInventory.FRUIT / total) * 100;
@@ -225,7 +835,6 @@ const Dashboard = () => {
     const dairyPercentage = (currentInventory.DAIRY / total) * 100;
     const grainPercentage = (currentInventory.GRAIN / total) * 100;
     
-    // MyPlate compliance check
     const vegOK = vegPercentage >= 13 && vegPercentage <= 17;
     const fruitOK = fruitPercentage >= 13 && fruitPercentage <= 17;
     const proteinOK = proteinPercentage >= 18 && proteinPercentage <= 22;
@@ -233,11 +842,11 @@ const Dashboard = () => {
     const grainOK = grainPercentage >= 13 && grainPercentage <= 17;
     
     const compliantCategories = [vegOK, fruitOK, proteinOK, dairyOK, grainOK].filter(Boolean).length;
-    return `${compliantCategories}/5 Categories Compliant`;
+    return { compliantCategories };
   };
 
   const getNutritionalScore = () => {
-    const total = getTotalInventory();
+    const total = memoizedTotalInventory;
     if (total === 0) return 'No data yet';
 
     // Calculate percentage of "green" (nutritious) foods
@@ -265,6 +874,128 @@ const Dashboard = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Failed to log out:', error);
+    }
+  };
+
+  // Critical Alerts System with performance optimization
+  const getCriticalAlerts = React.useMemo(() => {
+    const alerts = [];
+    const total = memoizedTotalInventory;
+    const targetCapacity = 900000;
+
+    // Low inventory alerts
+    Object.entries(currentInventory).forEach(([category, weight]) => {
+      const percentage = total > 0 ? (weight / total) * 100 : 0;
+      if (percentage < 5 && total > 0) {
+        alerts.push({
+          type: 'CRITICAL',
+          category: 'LOW_INVENTORY',
+          message: `${category} inventory critically low (${percentage.toFixed(1)}%)`,
+          action: 'Consider immediate restocking',
+          priority: 'high'
+        });
+      } else if (percentage < 10 && total > 0) {
+        alerts.push({
+          type: 'WARNING',
+          category: 'LOW_INVENTORY',
+          message: `${category} inventory low (${percentage.toFixed(1)}%)`,
+          action: 'Plan for restocking soon',
+          priority: 'medium'
+        });
+      }
+    });
+
+    // MyPlate compliance alerts
+    const myplateCompliance = getMyPlateComplianceData();
+    if (myplateCompliance.compliantCategories < 3) {
+      alerts.push({
+        type: 'WARNING',
+        category: 'MYPLATE_IMBALANCE',
+        message: `Only ${myplateCompliance.compliantCategories}/5 MyPlate categories are balanced`,
+        action: 'Review distribution targets',
+        priority: 'medium'
+      });
+    }
+
+    // Capacity alerts
+    const utilization = parseFloat(getCapacityUtilization());
+    if (utilization > 90) {
+      alerts.push({
+        type: 'CRITICAL',
+        category: 'CAPACITY_WARNING',
+        message: `Warehouse at ${utilization}% capacity`,
+        action: 'Increase distributions immediately',
+        priority: 'high'
+      });
+    } else if (utilization > 75) {
+      alerts.push({
+        type: 'WARNING',
+        category: 'CAPACITY_WARNING',
+        message: `Warehouse at ${utilization}% capacity`,
+        action: 'Plan for increased distributions',
+        priority: 'medium'
+      });
+    }
+
+    // Distribution efficiency alerts
+    if (outgoingMetrics.totalDistributedToday === 0 && total > 0) {
+      alerts.push({
+        type: 'WARNING',
+        category: 'NO_DISTRIBUTIONS',
+        message: 'No distributions recorded today',
+        action: 'Consider scheduling distributions to serve community',
+        priority: 'medium'
+      });
+    }
+
+    // Stagnant inventory alerts
+    const weeklyDistributionRate = total > 0 ? (outgoingMetrics.totalDistributedWeek / total) * 100 : 0;
+    if (weeklyDistributionRate < 5 && total > 10000) {
+      alerts.push({
+        type: 'WARNING',
+        category: 'STAGNANT_INVENTORY',
+        message: `Low distribution rate (${weeklyDistributionRate.toFixed(1)}% of inventory distributed this week)`,
+        action: 'Increase outreach and distribution activities',
+        priority: 'medium'
+      });
+    }
+
+    // High inventory distribution opportunity
+    Object.entries(currentInventory).forEach(([category, weight]) => {
+      const percentage = total > 0 ? (weight / total) * 100 : 0;
+      if (percentage > 25) {
+        alerts.push({
+          type: 'INFO',
+          category: 'DISTRIBUTION_OPPORTUNITY',
+          message: `${category} has high inventory (${percentage.toFixed(1)}%)`,
+          action: 'Good opportunity for targeted distribution',
+          priority: 'low'
+        });
+      }
+    });
+
+    // Distribution efficiency opportunities
+    if (outgoingMetrics.avgDistributionSize > 0 && outgoingMetrics.avgDistributionSize < 100) {
+      alerts.push({
+        type: 'INFO',
+        category: 'DISTRIBUTION_EFFICIENCY',
+        message: `Average distribution size is ${outgoingMetrics.avgDistributionSize.toFixed(1)} lbs`,
+        action: 'Consider larger bulk distributions for efficiency',
+        priority: 'low'
+      });
+    }
+
+    return alerts.sort((a, b) => {
+      const priorityOrder = { high: 3, medium: 2, low: 1 };
+      return priorityOrder[b.priority] - priorityOrder[a.priority];
+    });
+  }, [currentInventory, memoizedTotalInventory, outgoingMetrics]);
+
   return (
     <div className="dashboard">
       {/* Auto-save status indicator - subtle and temporary */}
@@ -275,12 +1006,50 @@ const Dashboard = () => {
       )}
 
       <header className="dashboard-header">
+        <div className="header-content">
+          <div className="header-left">
         <h1>Food Bank Inventory Manager</h1>
         {isFirstTime && (
           <div className="first-time-notice">
             <p>👋 Welcome! Start by entering your current inventory using the "Data Entry" tab.</p>
           </div>
         )}
+          </div>
+          <div className="header-right">
+            <div className="sync-status">
+              <div className={`sync-indicator ${syncStatus}`}>
+                {syncStatus === 'connected' && '🟢'}
+                {syncStatus === 'syncing' && '🟡'}
+                {syncStatus === 'disconnected' && '🔴'}
+                {syncStatus === 'error' && '⚠️'}
+                <span className="sync-text">
+                  {syncStatus === 'connected' && 'Synced'}
+                  {syncStatus === 'syncing' && 'Syncing...'}
+                  {syncStatus === 'disconnected' && 'Offline'}
+                  {syncStatus === 'error' && 'Sync Error'}
+                </span>
+                {lastSyncTime && (
+                  <span className="last-sync">
+                    {lastSyncTime.toLocaleTimeString()}
+                  </span>
+                )}
+                {pendingChanges && (
+                  <span className="pending-indicator">
+                    📤 Pending
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="user-profile">
+              <span className="user-name">
+                {currentUser?.displayName || currentUser?.email || 'User'}
+              </span>
+              <button onClick={handleLogout} className="logout-btn">
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
         <div className="header-stats">
           <div className="stat-card">
             <h3>Total Inventory</h3>
@@ -289,16 +1058,16 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="stat-card">
-            <h3>Capacity Utilization</h3>
-            <p className="stat-value">{getCapacityUtilization()}%</p>
+            <h3>Distributed Today</h3>
+            <p className="stat-value">{outgoingMetrics.totalDistributedToday.toLocaleString()} lbs</p>
           </div>
           <div className="stat-card">
             <h3>MyPlate Compliance</h3>
             <p className="stat-value">{getMyPlateCompliance()}</p>
           </div>
           <div className="stat-card">
-            <h3>Nutritional Quality</h3>
-            <p className="stat-value">{getNutritionalScore()}</p>
+            <h3>Clients Served Today</h3>
+            <p className="stat-value">{outgoingMetrics.clientsServedToday}</p>
           </div>
         </div>
       </header>
@@ -312,46 +1081,16 @@ const Dashboard = () => {
             Overview
           </button>
           <button 
-            className={activeTab === 'survey' ? 'active' : ''}
-            onClick={() => setActiveTab('survey')}
+            className={activeTab === 'dataentry' ? 'active' : ''}
+            onClick={() => setActiveTab('dataentry')}
           >
             Data Entry
-          </button>
-          <button 
-            className={activeTab === 'distribution' ? 'active' : ''}
-            onClick={() => setActiveTab('distribution')}
-          >
-            Distribution
-          </button>
-          <button 
-            className={activeTab === 'inventory' ? 'active' : ''}
-            onClick={() => setActiveTab('inventory')}
-          >
-            Inventory
           </button>
           <button 
             className={activeTab === 'myplate' ? 'active' : ''}
             onClick={() => setActiveTab('myplate')}
           >
             MyPlate Analysis
-          </button>
-          <button 
-            className={activeTab === 'ordering' ? 'active' : ''}
-            onClick={() => setActiveTab('ordering')}
-          >
-            Ordering
-          </button>
-          <button 
-            className={activeTab === 'units' ? 'active' : ''}
-            onClick={() => setActiveTab('units')}
-          >
-            Unit Config
-          </button>
-          <button 
-            className={activeTab === 'reports' ? 'active' : ''}
-            onClick={() => setActiveTab('reports')}
-          >
-            Reports
           </button>
         </div>
         
@@ -369,6 +1108,9 @@ const Dashboard = () => {
               style={{ display: 'none' }}
             />
           </label>
+          <button onClick={performSystemHealthCheck} className="util-btn" title="System health check">
+            🔧
+          </button>
           <button onClick={resetAllData} className="util-btn danger" title="Reset all data">
             ⟲
           </button>
@@ -384,15 +1126,77 @@ const Dashboard = () => {
                 <p>Get started by adding your current inventory using the "Data Entry" tab.</p>
                 <button 
                   className="get-started-btn"
-                  onClick={() => setActiveTab('survey')}
+                  onClick={() => setActiveTab('dataentry')}
                 >
                   Start Adding Inventory
                 </button>
               </div>
             ) : (
+              <div className="overview-content">
+                {/* Overview Navigation */}
+                <div className="overview-nav">
+                  <button 
+                    className={activeOverviewSection === 'dashboard' ? 'active' : ''}
+                    onClick={() => setActiveOverviewSection('dashboard')}
+                  >
+                    Dashboard
+                  </button>
+                  <button 
+                    className={activeOverviewSection === 'inventory' ? 'active' : ''}
+                    onClick={() => setActiveOverviewSection('inventory')}
+                  >
+                    Inventory Management
+                  </button>
+                  <button 
+                    className={activeOverviewSection === 'units' ? 'active' : ''}
+                    onClick={() => setActiveOverviewSection('units')}
+                  >
+                    Unit Configuration
+                  </button>
+                  <button 
+                    className={activeOverviewSection === 'reports' ? 'active' : ''}
+                    onClick={() => setActiveOverviewSection('reports')}
+                  >
+                    Analytics
+                  </button>
+                  <button 
+                    className={activeOverviewSection === 'distributions' ? 'active' : ''}
+                    onClick={() => setActiveOverviewSection('distributions')}
+                  >
+                    Distribution History
+                  </button>
+                </div>
+
+                {/* Dashboard Section */}
+                {activeOverviewSection === 'dashboard' && (
               <div className="overview-grid">
                 <div className="overview-section">
+                      <div className="section-header">
                   <h2>Current Inventory Distribution</h2>
+                        <div className="unit-toggle">
+                          <span className="toggle-label">Display as:</span>
+                          <div className="toggle-buttons">
+                            <button 
+                              className={`toggle-btn ${orderingUnit === 'pounds' ? 'active' : ''}`}
+                              onClick={() => setOrderingUnit('pounds')}
+                            >
+                              Pounds
+                            </button>
+                            <button 
+                              className={`toggle-btn ${orderingUnit === 'cases' ? 'active' : ''}`}
+                              onClick={() => setOrderingUnit('cases')}
+                            >
+                              Cases
+                            </button>
+                            <button 
+                              className={`toggle-btn ${orderingUnit === 'pallets' ? 'active' : ''}`}
+                              onClick={() => setOrderingUnit('pallets')}
+                            >
+                              Pallets
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                   <div className="category-grid">
                     {Object.entries(currentInventory).map(([category, weight]) => {
                       const total = getTotalInventory();
@@ -403,13 +1207,18 @@ const Dashboard = () => {
                       return (
                         <div key={category} className={`category-card ${isOverTarget ? 'over-target' : isUnderTarget ? 'under-target' : ''}`}>
                           <h4>{category}</h4>
-                          <p className="weight">{weight.toLocaleString()} lbs</p>
+                              <p className="weight">{formatInventoryValue(weight, category)}</p>
                           <p className="percentage">{percentage}%</p>
                           <div className="category-status">
                             {isOverTarget && <span className="status-badge over">OVER</span>}
                             {isUnderTarget && <span className="status-badge under">UNDER</span>}
                             {!isOverTarget && !isUnderTarget && <span className="status-badge okay">OKAY</span>}
                           </div>
+                              {orderingUnit !== 'pounds' && (
+                                <p className="weight-conversion">
+                                  ({weight.toLocaleString()} lbs)
+                                </p>
+                              )}
                         </div>
                       );
                     })}
@@ -417,22 +1226,27 @@ const Dashboard = () => {
                 </div>
 
                 <div className="overview-section">
-                  <h2>Recent Activity</h2>
-                  <div className="activity-feed">
-                    {recentActivity.length === 0 ? (
-                      <p className="no-activity">No recent activity. Start by entering some inventory data!</p>
-                    ) : (
-                      recentActivity.slice(0, 10).map((activity, index) => (
-                        <div key={index} className={`activity-item ${activity.type.toLowerCase()}`}>
-                          <div className="activity-icon">
-                            {activity.type === 'INTAKE' && '📦'}
-                            {activity.type === 'DISTRIBUTION' && '🚚'}
-                            {activity.type === 'ALERT' && '⚠️'}
-                            {activity.type === 'ORDER' && '📋'}
+                      <h2>Critical Alerts & Warnings</h2>
+                      <div className="alerts-feed">
+                        {getCriticalAlerts.length === 0 ? (
+                          <div className="no-alerts">
+                            <p>✅ No critical alerts at this time</p>
+                            <p>All systems are operating within normal parameters.</p>
                           </div>
-                          <div className="activity-content">
-                            <p className="activity-message">{activity.message}</p>
-                            <p className="activity-time">{activity.time}</p>
+                        ) : (
+                          getCriticalAlerts.slice(0, 8).map((alert, index) => (
+                            <div key={index} className={`alert-item ${alert.type.toLowerCase()}`}>
+                              <div className="alert-icon">
+                                {alert.type === 'CRITICAL' && '🚨'}
+                                {alert.type === 'WARNING' && '⚠️'}
+                                {alert.type === 'INFO' && '💡'}
+                          </div>
+                              <div className="alert-content">
+                                <p className="alert-message">{alert.message}</p>
+                                <p className="alert-action">{alert.action}</p>
+                              </div>
+                              <div className={`alert-priority ${alert.priority}`}>
+                                {alert.priority.toUpperCase()}
                           </div>
                         </div>
                       ))
@@ -445,7 +1259,7 @@ const Dashboard = () => {
                   <div className="quick-actions">
                     <button 
                       className="action-btn primary"
-                      onClick={() => setActiveTab('survey')}
+                          onClick={() => setActiveTab('dataentry')}
                     >
                       📝 Add Inventory
                     </button>
@@ -457,9 +1271,9 @@ const Dashboard = () => {
                     </button>
                     <button 
                       className="action-btn secondary"
-                      onClick={() => setActiveTab('reports')}
+                          onClick={() => setActiveOverviewSection('inventory')}
                     >
-                      📈 View Reports
+                          📦 Manage Inventory
                     </button>
                     <button 
                       className="action-btn danger"
@@ -469,42 +1283,215 @@ const Dashboard = () => {
                     </button>
                   </div>
                 </div>
+
+                    <div className="overview-section">
+                      <h2>Recent Distributions</h2>
+                      <div className="distribution-feed">
+                        {distributionHistory.length === 0 ? (
+                          <div className="no-distributions">
+                            <p>📦 No distributions recorded yet</p>
+                            <p>Start recording distributions to track outgoing food.</p>
               </div>
+                        ) : (
+                          distributionHistory.slice(0, 5).map((distribution, index) => (
+                            <div key={index} className="distribution-item">
+                              <div className="distribution-icon">📤</div>
+                              <div className="distribution-content">
+                                <p className="distribution-message">
+                                  {distribution.totalDistributed?.toFixed(1)} lbs to {distribution.recipient}
+                                </p>
+                                <p className="distribution-details">
+                                  {distribution.clientsServed} clients • {new Date(distribution.date).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="distribution-weight">
+                                {distribution.totalDistributed?.toFixed(0)} lbs
+                              </div>
+                            </div>
+                          ))
             )}
           </div>
-        )}
+                      {distributionHistory.length > 5 && (
+                        <button 
+                          className="view-all-btn"
+                          onClick={() => setActiveOverviewSection('distributions')}
+                        >
+                          View All Distributions
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-        {activeTab === 'survey' && (
-          <SurveyInterface onDataSubmit={handleSurveySubmit} />
-        )}
-
-        {activeTab === 'distribution' && (
-          <DistributionInterface onDataSubmit={handleSurveySubmit} />
-        )}
-
-        {activeTab === 'inventory' && (
+                {/* Inventory Management Section */}
+                {activeOverviewSection === 'inventory' && (
           <InventoryManager 
             currentInventory={currentInventory} 
             onNavigate={setActiveTab}
           />
         )}
 
+                {/* Unit Configuration Section */}
+                {activeOverviewSection === 'units' && (
+                  <UnitConfiguration 
+                    onConfigurationChange={(configs) => {
+                      setUnitConfigurations(configs);
+                      safeLocalStorageSet('unitConfigurations', configs);
+                    }}
+                  />
+                )}
+
+                {/* Analytics Section */}
+                {activeOverviewSection === 'reports' && (
+                  <div className="analytics-section">
+                    <h2>Analytics & Insights</h2>
+                    
+                    <div className="analytics-grid">
+                      <div className="analytics-card">
+                        <h3>Capacity Analysis</h3>
+                        <div className="capacity-visual">
+                          <div className="capacity-bar">
+                            <div 
+                              className="capacity-fill" 
+                              style={{width: `${getCapacityUtilization()}%`}}
+                            ></div>
+                          </div>
+                          <p className="capacity-percentage">{getCapacityUtilization()}%</p>
+                        </div>
+                        <p>{getTotalInventory().toLocaleString()} / 900,000 lbs</p>
+                      </div>
+                      
+                      <div className="analytics-card">
+                        <h3>Nutritional Quality</h3>
+                        <div className="nutrition-score">
+                          <div className="score-circle">
+                            <span className="score-value">{getNutritionalScore()}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="analytics-card">
+                        <h3>MyPlate Compliance</h3>
+                        <div className="compliance-indicator">
+                          <span className="compliance-value">{getMyPlateCompliance()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Distribution History Section */}
+                {activeOverviewSection === 'distributions' && (
+                  <div className="distribution-history-section">
+                    <h2>Distribution History & Analytics</h2>
+                    
+                    <div className="distribution-metrics">
+                      <div className="metric-card">
+                        <h3>Today</h3>
+                        <p className="metric-value">{outgoingMetrics.totalDistributedToday.toLocaleString()}</p>
+                        <p className="metric-label">lbs distributed</p>
+                      </div>
+                      <div className="metric-card">
+                        <h3>This Week</h3>
+                        <p className="metric-value">{outgoingMetrics.totalDistributedWeek.toLocaleString()}</p>
+                        <p className="metric-label">lbs distributed</p>
+                      </div>
+                      <div className="metric-card">
+                        <h3>Clients Today</h3>
+                        <p className="metric-value">{outgoingMetrics.clientsServedToday}</p>
+                        <p className="metric-label">people served</p>
+                      </div>
+                      <div className="metric-card">
+                        <h3>Avg Distribution</h3>
+                        <p className="metric-value">{outgoingMetrics.avgDistributionSize.toFixed(0)}</p>
+                        <p className="metric-label">lbs per event</p>
+                      </div>
+                    </div>
+
+                    <div className="distribution-list">
+                      <h3>Recent Distributions</h3>
+                      {distributionHistory.length === 0 ? (
+                        <div className="empty-state">
+                          <p>No distributions recorded yet. Start tracking outgoing food distributions.</p>
+                          <button 
+                            className="get-started-btn"
+                            onClick={() => setActiveTab('dataentry')}
+                          >
+                            Record First Distribution
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="distribution-table">
+                          {distributionHistory.slice(0, 20).map((distribution, index) => (
+                            <div key={index} className="distribution-row">
+                              <div className="distribution-date">
+                                {new Date(distribution.date).toLocaleDateString()}
+                              </div>
+                              <div className="distribution-recipient">
+                                {distribution.recipient}
+                              </div>
+                              <div className="distribution-amount">
+                                {distribution.totalDistributed?.toFixed(1)} lbs
+                              </div>
+                              <div className="distribution-clients">
+                                {distribution.clientsServed} clients
+                              </div>
+                              <div className="distribution-categories">
+                                {Object.keys(distribution.categoryTotals || {}).length} categories
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'dataentry' && (
+          <div className="data-entry-tab">
+            <div className="data-entry-nav">
+              <button 
+                className="tab-btn active"
+                onClick={() => {/* Could add sub-tabs for intake vs distribution */}}
+              >
+                Intake & Distribution
+              </button>
+            </div>
+            <div className="data-entry-content">
+              <div className="entry-section">
+                <h3>Record Intake</h3>
+                <SurveyInterface onDataSubmit={handleSurveySubmit} />
+              </div>
+              <div className="entry-section">
+                <h3>Record Distribution</h3>
+                <DistributionInterface onDataSubmit={handleSurveySubmit} />
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'myplate' && (
           <MyPlateCalculator currentInventory={currentInventory} />
         )}
-
-        {activeTab === 'ordering' && (
-          <OrderingSystem currentInventory={currentInventory} />
-        )}
-
-        {activeTab === 'units' && (
-          <UnitConfiguration />
-        )}
-
-        {activeTab === 'reports' && (
-          <ReportView currentInventory={currentInventory} />
-        )}
       </main>
+
+      {/* Storage Status Indicator */}
+      {storageStatus !== 'healthy' && (
+        <div className={`storage-status ${storageStatus}`}>
+          <div>
+            {storageStatus === 'error' ? '⚠️ Storage Error' : '⚠️ Storage Warning'}
+          </div>
+          {lastBackupTime && (
+            <div className={`backup-indicator ${Date.now() - lastBackupTime.getTime() < 600000 ? 'recent' : ''}`}>
+              Last backup: {lastBackupTime.toLocaleTimeString()}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
