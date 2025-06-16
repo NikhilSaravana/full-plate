@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FOOD_CATEGORY_MAPPING, getMyPlateCategory } from './FoodCategoryMapper';
 import { UnitConverters } from './UnitConfiguration';
+import ConfirmationDialog from './ConfirmationDialog';
 
 const SurveyInterface = ({ onDataSubmit }) => {
   const [surveyMode, setSurveyMode] = useState('SINGLE'); // SINGLE, BULK, DISTRIBUTION
@@ -20,6 +21,8 @@ const SurveyInterface = ({ onDataSubmit }) => {
     avgFamilySize: '3',
     categories: {}
   });
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmationConfig, setConfirmationConfig] = useState({});
 
   const availableUnits = UnitConverters.getAvailableUnits();
 
@@ -61,13 +64,27 @@ const SurveyInterface = ({ onDataSubmit }) => {
       setBulkData('');
       setSurveyMode('SINGLE');
     } catch (error) {
-      alert('Error parsing bulk data. Please check format.');
+      setConfirmationConfig({
+        type: 'error',
+        title: 'Parsing Error',
+        message: 'Error parsing bulk data. Please check the format and try again. Make sure each line follows: Food Type, Quantity, Unit, Expiration Date, Notes',
+        confirmText: 'OK',
+        onConfirm: () => setShowConfirmation(false)
+      });
+      setShowConfirmation(true);
     }
   };
 
   const submitSurvey = () => {
     if (surveyMode === 'SINGLE' && items.some(item => !item.foodType || !item.quantity)) {
-      alert('Please fill in all required fields');
+      setConfirmationConfig({
+        type: 'error',
+        title: 'Missing Information',
+        message: 'Please fill in all required fields (Food Type and Quantity) before submitting the survey.',
+        confirmText: 'OK',
+        onConfirm: () => setShowConfirmation(false)
+      });
+      setShowConfirmation(true);
       return;
     }
 
@@ -119,7 +136,17 @@ const SurveyInterface = ({ onDataSubmit }) => {
       categories: {}
     });
 
-    alert('Survey data submitted successfully!');
+    const totalWeight = surveyMode === 'SINGLE' ? calculateTotalWeight() : parseFloat(distributionData.totalDistributed) || 0;
+    const itemCount = surveyMode === 'SINGLE' ? items.filter(item => item.foodType && item.quantity).length : 1;
+    
+    setConfirmationConfig({
+      type: 'success',
+      title: 'Survey Submitted',
+      message: `Successfully recorded ${surveyMode.toLowerCase()} entry with ${totalWeight.toFixed(1)} lbs across ${itemCount} item${itemCount !== 1 ? 's' : ''}.`,
+      confirmText: 'OK',
+      onConfirm: () => setShowConfirmation(false)
+    });
+    setShowConfirmation(true);
   };
 
   const getFoodTypeOptions = () => {
@@ -157,21 +184,21 @@ const SurveyInterface = ({ onDataSubmit }) => {
     <div className="survey-interface">
       <div className="survey-header">
         <h2>Data Entry Survey</h2>
-        <div className="mode-selector">
+        <div className="nav-with-icons" style={{ marginBottom: '24px' }}>
           <button
-            className={surveyMode === 'SINGLE' ? 'active' : ''}
+            className={`nav-tab ${surveyMode === 'SINGLE' ? 'active' : ''}`}
             onClick={() => setSurveyMode('SINGLE')}
           >
             Single Entry
           </button>
           <button
-            className={surveyMode === 'BULK' ? 'active' : ''}
+            className={`nav-tab ${surveyMode === 'BULK' ? 'active' : ''}`}
             onClick={() => setSurveyMode('BULK')}
           >
             Bulk Import
           </button>
           <button
-            className={surveyMode === 'DISTRIBUTION' ? 'active' : ''}
+            className={`nav-tab ${surveyMode === 'DISTRIBUTION' ? 'active' : ''}`}
             onClick={() => setSurveyMode('DISTRIBUTION')}
           >
             Distribution Log
@@ -185,16 +212,18 @@ const SurveyInterface = ({ onDataSubmit }) => {
           <h3>General Information</h3>
           <div className="form-grid">
             <div className="form-field">
-              <label>Date:</label>
+              <label className="form-label-enhanced">Date:</label>
               <input
                 type="date"
+                className="form-control-enhanced"
                 value={formData.date}
                 onChange={(e) => setFormData({...formData, date: e.target.value})}
               />
             </div>
             <div className="form-field">
-              <label>Source:</label>
+              <label className="form-label-enhanced">Source:</label>
               <select
+                className="form-control-enhanced"
                 value={formData.source}
                 onChange={(e) => setFormData({...formData, source: e.target.value})}
               >
@@ -208,8 +237,9 @@ const SurveyInterface = ({ onDataSubmit }) => {
             </div>
           </div>
           <div className="form-field">
-            <label>Notes:</label>
+            <label className="form-label-enhanced">Notes:</label>
             <textarea
+              className="form-control-enhanced"
               value={formData.notes}
               onChange={(e) => setFormData({...formData, notes: e.target.value})}
               placeholder="Additional notes or comments..."
@@ -221,14 +251,16 @@ const SurveyInterface = ({ onDataSubmit }) => {
         {/* Single Entry Mode */}
         {surveyMode === 'SINGLE' && (
           <div className="form-section">
-            <div className="section-header">
-              <h3>Inventory Items</h3>
-              <div className="quick-add">
-                <span>Quick Add:</span>
+            <h3>Inventory Items</h3>
+            <div className="quick-add-section">
+              <div className="quick-add-header">
+                <span className="quick-add-label">Quick Add Common Items:</span>
+              </div>
+              <div className="quick-add-buttons">
                 {getQuickAddButtons().map(item => (
                   <button
                     key={item}
-                    className="quick-add-btn"
+                    className="btn btn-light quick-add-item"
                     onClick={() => {
                       const newItem = { foodType: item, quantity: '', unit: 'POUNDS', expirationDate: '', notes: '' };
                       setItems([...items, newItem]);
@@ -242,72 +274,101 @@ const SurveyInterface = ({ onDataSubmit }) => {
 
             {items.map((item, index) => (
               <div key={index} className="item-row">
-                <div className="item-inputs">
-                  <select
-                    value={item.foodType}
-                    onChange={(e) => updateItem(index, 'foodType', e.target.value)}
-                    className="food-type-select"
-                  >
-                    <option value="">Select Food Type</option>
-                    {getFoodTypeOptions().map(option => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="Quantity"
-                    value={item.quantity}
-                    onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                  />
-                  <select
-                    value={item.unit}
-                    onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                    className="unit-select"
-                  >
-                    {availableUnits.map(unit => (
-                      <option key={unit.key} value={unit.key}>
-                        {unit.name} ({unit.abbreviation})
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="date"
-                    placeholder="Expiration"
-                    value={item.expirationDate}
-                    onChange={(e) => updateItem(index, 'expirationDate', e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Notes"
-                    value={item.notes}
-                    onChange={(e) => updateItem(index, 'notes', e.target.value)}
-                  />
-                  <div className="item-preview">
-                    <span className="category-preview">
-                      {item.foodType ? getMyPlateCategory(item.foodType) : ''}
-                    </span>
-                    <span className="weight-preview">
-                      {item.quantity && item.foodType ? 
-                        getUnitDisplayWeight(item.quantity, item.unit, getMyPlateCategory(item.foodType)) : 
-                        ''
-                      }
-                    </span>
+                <div className="item-main-row">
+                  <div className="item-inputs">
+                    <div className="input-group">
+                      <label className="form-label-enhanced">Food Type</label>
+                      <select
+                        value={item.foodType}
+                        onChange={(e) => updateItem(index, 'foodType', e.target.value)}
+                        className="form-control-enhanced"
+                      >
+                        <option value="">Select Food Type</option>
+                        {getFoodTypeOptions().map(option => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="input-group">
+                      <label className="form-label-enhanced">Quantity</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="Quantity"
+                        className="form-control-enhanced"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label className="form-label-enhanced">Unit</label>
+                      <select
+                        value={item.unit}
+                        onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                        className="form-control-enhanced"
+                      >
+                        {availableUnits.map(unit => (
+                          <option key={unit.key} value={unit.key}>
+                            {unit.name} ({unit.abbreviation})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="input-group">
+                      <label className="form-label-enhanced">Expiration</label>
+                      <input
+                        type="date"
+                        placeholder="Expiration"
+                        className="form-control-enhanced"
+                        value={item.expirationDate}
+                        onChange={(e) => updateItem(index, 'expirationDate', e.target.value)}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label className="form-label-enhanced">Category</label>
+                      <div className="category-display">
+                        {item.foodType ? getMyPlateCategory(item.foodType) : 'Select food first'}
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label className="form-label-enhanced">Weight</label>
+                      <div className="weight-display">
+                        {item.quantity && item.foodType ? 
+                          getUnitDisplayWeight(item.quantity, item.unit, getMyPlateCategory(item.foodType)) : 
+                          'Enter quantity'
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <div className="remove-button-container">
+                    {items.length > 1 && (
+                      <button
+                        onClick={() => removeItem(index)}
+                        className="btn btn-danger remove-btn"
+                        title="Remove this item"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                 </div>
-                {items.length > 1 && (
-                  <button
-                    onClick={() => removeItem(index)}
-                    className="remove-item-btn"
-                  >
-                    ✕
-                  </button>
-                )}
+                <div className="item-notes-row">
+                  <div className="input-group notes-input-group">
+                    <label className="form-label-enhanced">Notes (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="Additional notes about this item..."
+                      className="form-control-enhanced"
+                      value={item.notes}
+                      onChange={(e) => updateItem(index, 'notes', e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
             ))}
 
-            <button onClick={addItem} className="add-item-btn">
-              + Add Another Item
+            <button onClick={addItem} className="btn btn-primary" style={{ marginTop: '16px' }}>
+              Add Another Item
             </button>
 
             {items.length > 0 && (
@@ -335,9 +396,9 @@ const SurveyInterface = ({ onDataSubmit }) => {
               onChange={(e) => setBulkData(e.target.value)}
               placeholder="BREAD, 5, PALLET, 2024-02-15, From food drive&#10;MILK, 20, CASE, 2024-02-10&#10;RICE, 1000, POUNDS, 2025-01-01"
               rows="10"
-              className="bulk-textarea"
+              className="form-control-enhanced"
             />
-            <button onClick={handleBulkDataParse} className="parse-btn">
+            <button onClick={handleBulkDataParse} className="btn btn-primary" style={{ marginTop: '16px' }}>
               Parse Data
             </button>
           </div>
@@ -349,10 +410,11 @@ const SurveyInterface = ({ onDataSubmit }) => {
             <h3>Distribution Log</h3>
             <div className="form-grid">
               <div className="form-field">
-                <label>Total Distributed:</label>
+                <label className="form-label-enhanced">Total Distributed:</label>
                 <input
                   type="number"
                   step="0.1"
+                  className="form-control-enhanced"
                   value={distributionData.totalDistributed}
                   onChange={(e) => setDistributionData({
                     ...distributionData,
@@ -361,8 +423,9 @@ const SurveyInterface = ({ onDataSubmit }) => {
                 />
               </div>
               <div className="form-field">
-                <label>Unit:</label>
+                <label className="form-label-enhanced">Unit:</label>
                 <select
+                  className="form-control-enhanced"
                   value={distributionData.unit}
                   onChange={(e) => setDistributionData({
                     ...distributionData,
@@ -377,9 +440,10 @@ const SurveyInterface = ({ onDataSubmit }) => {
                 </select>
               </div>
               <div className="form-field">
-                <label>Clients Served:</label>
+                <label className="form-label-enhanced">Clients Served:</label>
                 <input
                   type="number"
+                  className="form-control-enhanced"
                   value={distributionData.clientsServed}
                   onChange={(e) => setDistributionData({
                     ...distributionData,
@@ -388,10 +452,11 @@ const SurveyInterface = ({ onDataSubmit }) => {
                 />
               </div>
               <div className="form-field">
-                <label>Avg Family Size:</label>
+                <label className="form-label-enhanced">Avg Family Size:</label>
                 <input
                   type="number"
                   step="0.1"
+                  className="form-control-enhanced"
                   value={distributionData.avgFamilySize}
                   onChange={(e) => setDistributionData({
                     ...distributionData,
@@ -422,12 +487,24 @@ const SurveyInterface = ({ onDataSubmit }) => {
           </div>
         )}
 
-        <div className="form-actions">
-          <button onClick={submitSurvey} className="submit-btn">
+        <div className="form-actions" style={{ marginTop: '32px', textAlign: 'center' }}>
+          <button onClick={submitSurvey} className="btn btn-primary btn-large">
             Submit Survey
           </button>
         </div>
       </div>
+      
+      {showConfirmation && (
+        <ConfirmationDialog
+          type={confirmationConfig.type}
+          title={confirmationConfig.title}
+          message={confirmationConfig.message}
+          confirmText={confirmationConfig.confirmText}
+          cancelText={confirmationConfig.cancelText}
+          onConfirm={confirmationConfig.onConfirm}
+          onCancel={confirmationConfig.onCancel}
+        />
+      )}
     </div>
   );
 };

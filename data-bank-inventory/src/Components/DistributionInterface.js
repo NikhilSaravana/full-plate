@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FOOD_CATEGORY_MAPPING, getMyPlateCategory } from './FoodCategoryMapper';
 import { UnitConverters } from './UnitConfiguration';
+import ConfirmationDialog from './ConfirmationDialog';
 
 const DistributionInterface = ({ onDataSubmit }) => {
   const [formData, setFormData] = useState({
@@ -15,6 +16,8 @@ const DistributionInterface = ({ onDataSubmit }) => {
     clientsServed: '',
     avgFamilySize: '3'
   });
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmationConfig, setConfirmationConfig] = useState({});
 
   const availableUnits = UnitConverters.getAvailableUnits();
 
@@ -59,7 +62,14 @@ const DistributionInterface = ({ onDataSubmit }) => {
 
   const submitDistribution = () => {
     if (items.some(item => !item.foodType || !item.quantity)) {
-      alert('Please fill in all required fields');
+      setConfirmationConfig({
+        type: 'error',
+        title: 'Missing Information',
+        message: 'Please fill in all required fields (Food Type and Quantity) before recording the distribution.',
+        confirmText: 'OK',
+        onConfirm: () => setShowConfirmation(false)
+      });
+      setShowConfirmation(true);
       return;
     }
 
@@ -105,7 +115,14 @@ const DistributionInterface = ({ onDataSubmit }) => {
       avgFamilySize: '3'
     });
 
-    alert('Distribution recorded successfully!');
+    setConfirmationConfig({
+      type: 'success',
+      title: 'Distribution Recorded',
+      message: `Successfully recorded distribution of ${calculateTotalWeight().toFixed(1)} lbs to ${formData.recipient || 'recipient'}.`,
+      confirmText: 'OK',
+      onConfirm: () => setShowConfirmation(false)
+    });
+    setShowConfirmation(true);
   };
 
   const getFoodTypeOptions = () => {
@@ -121,44 +138,47 @@ const DistributionInterface = ({ onDataSubmit }) => {
   };
 
   return (
-    <div className="distribution-interface">
-      <h2>Record Distribution</h2>
+    <div className="survey-interface">
       <div className="form-container">
         {/* Basic Information */}
         <div className="form-section">
           <h3>Distribution Details</h3>
           <div className="form-grid">
             <div className="form-field">
-              <label>Date:</label>
+              <label className="form-label-enhanced">Date:</label>
               <input
                 type="date"
+                className="form-control-enhanced"
                 value={formData.date}
                 onChange={(e) => setFormData({...formData, date: e.target.value})}
               />
             </div>
             <div className="form-field">
-              <label>Recipient Organization/Program:</label>
+              <label className="form-label-enhanced">Recipient Organization/Program:</label>
               <input
                 type="text"
+                className="form-control-enhanced"
                 value={formData.recipient}
                 onChange={(e) => setFormData({...formData, recipient: e.target.value})}
                 placeholder="e.g., Local Food Pantry"
               />
             </div>
             <div className="form-field">
-              <label>Clients Served:</label>
+              <label className="form-label-enhanced">Clients Served:</label>
               <input
                 type="number"
+                className="form-control-enhanced"
                 value={clientInfo.clientsServed}
                 onChange={(e) => setClientInfo({...clientInfo, clientsServed: e.target.value})}
                 placeholder="Number of clients"
               />
             </div>
             <div className="form-field">
-              <label>Average Family Size:</label>
+              <label className="form-label-enhanced">Average Family Size:</label>
               <input
                 type="number"
                 step="0.1"
+                className="form-control-enhanced"
                 value={clientInfo.avgFamilySize}
                 onChange={(e) => setClientInfo({...clientInfo, avgFamilySize: e.target.value})}
               />
@@ -169,8 +189,10 @@ const DistributionInterface = ({ onDataSubmit }) => {
         {/* Items Section */}
         <div className="form-section">
           <h3>Distributed Items</h3>
-          <div className="quick-add">
-            <p>Quick Add:</p>
+          <div className="quick-add-section">
+            <div className="quick-add-header">
+              <span className="quick-add-label">Quick Add Common Items:</span>
+            </div>
             <div className="quick-add-buttons">
               {getQuickAddButtons().map(item => (
                 <button
@@ -183,7 +205,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
                       setItems([...items, { foodType: item, quantity: '', unit: 'POUNDS', notes: '' }]);
                     }
                   }}
-                  className="quick-add-btn"
+                  className="btn btn-light quick-add-item"
                 >
                   {item}
                 </button>
@@ -193,68 +215,91 @@ const DistributionInterface = ({ onDataSubmit }) => {
 
           {items.map((item, index) => (
             <div key={index} className="item-row">
-              <div className="item-fields">
-                <select
-                  value={item.foodType}
-                  onChange={(e) => updateItem(index, 'foodType', e.target.value)}
-                  className="food-type-select"
-                >
-                  <option value="">Select Food Type</option>
-                  {getFoodTypeOptions().map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={item.quantity}
-                  onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                  placeholder="Quantity"
-                  className="quantity-input"
-                />
-                <select
-                  value={item.unit}
-                  onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                  className="unit-select"
-                >
-                  {availableUnits.map(unit => (
-                    <option key={unit.key} value={unit.key}>
-                      {unit.name} ({unit.abbreviation})
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={item.notes}
-                  onChange={(e) => updateItem(index, 'notes', e.target.value)}
-                  placeholder="Notes (optional)"
-                  className="notes-input"
-                />
-                <div className="item-preview">
-                  <span className="category-preview">
-                    {item.foodType ? getMyPlateCategory(item.foodType) : ''}
-                  </span>
-                  <span className="weight-preview">
-                    {item.quantity && item.foodType ? 
-                      getUnitDisplayWeight(item.quantity, item.unit, getMyPlateCategory(item.foodType)) : 
-                      ''
-                    }
-                  </span>
+              <div className="item-main-row">
+                <div className="item-inputs">
+                  <div className="input-group">
+                    <label className="form-label-enhanced">Food Type</label>
+                    <select
+                      value={item.foodType}
+                      onChange={(e) => updateItem(index, 'foodType', e.target.value)}
+                      className="form-control-enhanced"
+                    >
+                      <option value="">Select Food Type</option>
+                      {getFoodTypeOptions().map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group">
+                    <label className="form-label-enhanced">Quantity</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                      placeholder="Quantity"
+                      className="form-control-enhanced"
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label className="form-label-enhanced">Unit</label>
+                    <select
+                      value={item.unit}
+                      onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                      className="form-control-enhanced"
+                    >
+                      {availableUnits.map(unit => (
+                        <option key={unit.key} value={unit.key}>
+                          {unit.name} ({unit.abbreviation})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="input-group">
+                    <label className="form-label-enhanced">Category</label>
+                    <div className="category-display">
+                      {item.foodType ? getMyPlateCategory(item.foodType) : 'Select food first'}
+                    </div>
+                  </div>
+                  <div className="input-group">
+                    <label className="form-label-enhanced">Weight</label>
+                    <div className="weight-display">
+                      {item.quantity && item.foodType ? 
+                        getUnitDisplayWeight(item.quantity, item.unit, getMyPlateCategory(item.foodType)) : 
+                        'Enter quantity'
+                      }
+                    </div>
+                  </div>
+                </div>
+                <div className="remove-button-container">
+                  {items.length > 1 && (
+                    <button
+                      onClick={() => removeItem(index)}
+                      className="btn btn-danger remove-btn"
+                      title="Remove this item"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
               </div>
-              {items.length > 1 && (
-                <button
-                  onClick={() => removeItem(index)}
-                  className="remove-item-btn"
-                >
-                  ✕
-                </button>
-              )}
+              <div className="item-notes-row">
+                <div className="input-group notes-input-group">
+                  <label className="form-label-enhanced">Notes (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Additional notes about this item..."
+                    className="form-control-enhanced"
+                    value={item.notes}
+                    onChange={(e) => updateItem(index, 'notes', e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
           ))}
 
-          <button onClick={addItem} className="add-item-btn">
-            + Add Another Item
+          <button onClick={addItem} className="btn btn-secondary">
+            Add Another Item
           </button>
 
           {items.length > 0 && (
@@ -273,8 +318,9 @@ const DistributionInterface = ({ onDataSubmit }) => {
 
         <div className="form-section">
           <div className="form-field">
-            <label>Additional Notes:</label>
+            <label className="form-label-enhanced">Additional Notes:</label>
             <textarea
+              className="form-control-enhanced"
               value={formData.notes}
               onChange={(e) => setFormData({...formData, notes: e.target.value})}
               placeholder="Any additional notes about this distribution"
@@ -284,11 +330,23 @@ const DistributionInterface = ({ onDataSubmit }) => {
         </div>
 
         <div className="form-actions">
-          <button onClick={submitDistribution} className="submit-btn">
+          <button onClick={submitDistribution} className="btn btn-primary">
             Record Distribution
           </button>
         </div>
       </div>
+      
+      {showConfirmation && (
+        <ConfirmationDialog
+          type={confirmationConfig.type}
+          title={confirmationConfig.title}
+          message={confirmationConfig.message}
+          confirmText={confirmationConfig.confirmText}
+          cancelText={confirmationConfig.cancelText}
+          onConfirm={confirmationConfig.onConfirm}
+          onCancel={confirmationConfig.onCancel}
+        />
+      )}
     </div>
   );
 };

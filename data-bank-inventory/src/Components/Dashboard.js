@@ -5,6 +5,7 @@ import InventoryManager from './InventoryManager';
 import SurveyInterface from './SurveyInterface';
 import DistributionInterface from './DistributionInterface';
 import UnitConfiguration from './UnitConfiguration';
+import ConfirmationDialog from './ConfirmationDialog';
 import firestoreService from '../services/firestoreService';
 
 const Dashboard = () => {
@@ -43,6 +44,17 @@ const Dashboard = () => {
   // Enhanced Local Storage Management
   const [storageStatus, setStorageStatus] = useState('healthy');
   const [lastBackupTime, setLastBackupTime] = useState(null);
+
+  // Phase 7A: Enhanced UI State Management
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  });
+  const [currentSection, setCurrentSection] = useState('overview'); // For breadcrumb navigation
+  const [showHelp, setShowHelp] = useState(false);
 
   // Firebase Integration State
   const [syncStatus, setSyncStatus] = useState('disconnected'); // 'connected', 'syncing', 'error', 'disconnected'
@@ -856,8 +868,32 @@ System Health Check:
     return `${percentage}% Nutritious Foods`;
   };
 
+  // Phase 7A: Enhanced confirmation dialogs
+  const showConfirmation = (title, message, onConfirm, type = 'danger') => {
+    setConfirmationDialog({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      type
+    });
+  };
+
+  const closeConfirmation = () => {
+    setConfirmationDialog({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: null,
+      type: 'danger'
+    });
+  };
+
   const resetAllData = () => {
-    if (window.confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+    showConfirmation(
+      'Reset All Data',
+      'This will permanently delete all your inventory data, distribution history, and settings. This action cannot be undone. Are you sure you want to continue?',
+      () => {
       localStorage.clear();
       setCurrentInventory({
         'DAIRY': 0,
@@ -869,9 +905,11 @@ System Health Check:
         'MISC': 0
       });
       setRecentActivity([]);
+        setDistributionHistory([]);
       setIsFirstTime(true);
-      showAutoSaveStatus('All data reset');
-    }
+        showAutoSaveStatus('All data has been reset', false);
+      }
+    );
   };
 
   const handleLogout = async () => {
@@ -1010,32 +1048,32 @@ System Health Check:
           <div className="header-left">
         <h1>Food Bank Inventory Manager</h1>
         {isFirstTime && (
-          <div className="first-time-notice">
-            <p>👋 Welcome! Start by entering your current inventory using the "Data Entry" tab.</p>
+          <div className="help-text-prominent">
+            <strong>Welcome to your Food Bank Inventory Manager!</strong>
+            <br />
+            Get started by clicking the "Food Intake" tab above to record your current food inventory. 
+            This system will help you track food donations, manage distributions, and ensure nutritional balance.
           </div>
         )}
           </div>
           <div className="header-right">
+            {/* Phase 7A: Enhanced Status Indicator */}
             <div className="sync-status">
-              <div className={`sync-indicator ${syncStatus}`}>
-                {syncStatus === 'connected' && '🟢'}
-                {syncStatus === 'syncing' && '🟡'}
-                {syncStatus === 'disconnected' && '🔴'}
-                {syncStatus === 'error' && '⚠️'}
-                <span className="sync-text">
-                  {syncStatus === 'connected' && 'Synced'}
-                  {syncStatus === 'syncing' && 'Syncing...'}
-                  {syncStatus === 'disconnected' && 'Offline'}
-                  {syncStatus === 'error' && 'Sync Error'}
+              <div className={`status-indicator ${
+                syncStatus === 'connected' ? 'status-good' : 
+                syncStatus === 'syncing' ? 'status-warning' : 
+                syncStatus === 'error' ? 'status-danger' : 'status-info'
+              }`}>
+
+                <span>
+                  {syncStatus === 'connected' && 'Data Saved'}
+                  {syncStatus === 'syncing' && 'Saving...'}
+                  {syncStatus === 'disconnected' && 'Working Offline'}
+                  {syncStatus === 'error' && 'Save Error'}
                 </span>
-                {lastSyncTime && (
-                  <span className="last-sync">
-                    {lastSyncTime.toLocaleTimeString()}
-                  </span>
-                )}
                 {pendingChanges && (
-                  <span className="pending-indicator">
-                    📤 Pending
+                  <span style={{ marginLeft: '8px', fontSize: '12px' }}>
+                    (Changes Pending)
                   </span>
                 )}
               </div>
@@ -1044,7 +1082,7 @@ System Health Check:
               <span className="user-name">
                 {currentUser?.displayName || currentUser?.email || 'User'}
               </span>
-              <button onClick={handleLogout} className="logout-btn">
+              <button onClick={handleLogout} className="btn btn-light" style={{ minHeight: '36px', padding: '8px 16px' }}>
                 Sign Out
               </button>
             </div>
@@ -1072,35 +1110,59 @@ System Health Check:
         </div>
       </header>
 
+      {/* Phase 7A: Enhanced Navigation with Icons and Breadcrumbs */}
       <nav className="dashboard-nav">
-        <div className="nav-main">
+        <div className="nav-with-icons">
           <button 
-            className={activeTab === 'overview' ? 'active' : ''}
-            onClick={() => setActiveTab('overview')}
+            className={`nav-tab ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('overview');
+              setCurrentSection('overview');
+            }}
           >
             Overview
           </button>
           <button 
-            className={activeTab === 'dataentry' ? 'active' : ''}
-            onClick={() => setActiveTab('dataentry')}
+            className={`nav-tab ${activeTab === 'dataentry' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('dataentry');
+              setCurrentSection('dataentry');
+            }}
           >
-            Data Entry
+            Food Intake
           </button>
           <button 
-            className={activeTab === 'myplate' ? 'active' : ''}
-            onClick={() => setActiveTab('myplate')}
+            className={`nav-tab ${activeTab === 'distribution' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('distribution');
+              setCurrentSection('distribution');
+            }}
+          >
+            Distribution
+          </button>
+          <button 
+            className={`nav-tab ${activeTab === 'myplate' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('myplate');
+              setCurrentSection('myplate');
+            }}
           >
             MyPlate Analysis
           </button>
         </div>
         
-        {/* Subtle data management controls */}
+        {/* Phase 7A: Enhanced Utility Controls with Tooltips */}
         <div className="nav-utils">
-          <button onClick={exportAllData} className="util-btn" title="Export backup">
-            ⬇
+                      <div className="tooltip-wrapper">
+            <button onClick={exportAllData} className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px' }}>
+              Export
           </button>
-          <label className="util-btn" title="Import data">
-            ⬆
+            <div className="tooltip">Export Data Backup</div>
+          </div>
+          
+          <div className="tooltip-wrapper">
+            <label className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px', cursor: 'pointer' }}>
+              Import
             <input
               type="file"
               accept=".json"
@@ -1108,24 +1170,75 @@ System Health Check:
               style={{ display: 'none' }}
             />
           </label>
-          <button onClick={performSystemHealthCheck} className="util-btn" title="System health check">
-            🔧
+            <div className="tooltip">Import Data</div>
+          </div>
+          
+          <div className="tooltip-wrapper">
+            <button onClick={performSystemHealthCheck} className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px' }}>
+              Check
           </button>
-          <button onClick={resetAllData} className="util-btn danger" title="Reset all data">
-            ⟲
-          </button>
+            <div className="tooltip">System Health Check</div>
+          </div>
+          
+          <div className="tooltip-wrapper">
+            <button onClick={resetAllData} className="btn btn-danger" style={{ minWidth: 'auto', padding: '8px 12px' }}>
+              Reset
+            </button>
+            <div className="tooltip">Reset All Data</div>
+          </div>
         </div>
       </nav>
 
       <main className="dashboard-content">
+        {/* Phase 7A: Breadcrumb Navigation */}
+        <div className="breadcrumb">
+          <div className="breadcrumb-item">
+            <span>Food Bank Manager</span>
+          </div>
+          <span className="breadcrumb-separator">›</span>
+          <div className="breadcrumb-item breadcrumb-current">
+            {activeTab === 'overview' && (
+              <>
+                <span>Overview</span>
+                {activeOverviewSection !== 'dashboard' && (
+                  <>
+                    <span className="breadcrumb-separator">›</span>
+                    <span>
+                      {activeOverviewSection === 'inventory' && 'Inventory Management'}
+                      {activeOverviewSection === 'units' && 'Unit Configuration'}
+                      {activeOverviewSection === 'reports' && 'Analytics'}
+                      {activeOverviewSection === 'distributions' && 'Distribution History'}
+                    </span>
+                  </>
+                )}
+              </>
+            )}
+            {activeTab === 'dataentry' && (
+              <>
+                <span>Food Intake</span>
+              </>
+            )}
+            {activeTab === 'distribution' && (
+              <>
+                <span>Distribution</span>
+              </>
+            )}
+            {activeTab === 'myplate' && (
+              <>
+                <span>MyPlate Analysis</span>
+              </>
+            )}
+          </div>
+        </div>
+
         {activeTab === 'overview' && (
           <div className="overview-tab">
             {getTotalInventory() === 0 ? (
               <div className="empty-state">
-                <h2>📦 No Inventory Data Yet</h2>
+                <h2>No Inventory Data Yet</h2>
                 <p>Get started by adding your current inventory using the "Data Entry" tab.</p>
                 <button 
-                  className="get-started-btn"
+                  className="btn btn-primary btn-large"
                   onClick={() => setActiveTab('dataentry')}
                 >
                   Start Adding Inventory
@@ -1133,37 +1246,37 @@ System Health Check:
               </div>
             ) : (
               <div className="overview-content">
-                {/* Overview Navigation */}
-                <div className="overview-nav">
+                {/* Phase 7A: Enhanced Overview Navigation */}
+                <div className="nav-with-icons" style={{ marginBottom: '24px' }}>
                   <button 
-                    className={activeOverviewSection === 'dashboard' ? 'active' : ''}
+                    className={`nav-tab ${activeOverviewSection === 'dashboard' ? 'active' : ''}`}
                     onClick={() => setActiveOverviewSection('dashboard')}
                   >
                     Dashboard
                   </button>
                   <button 
-                    className={activeOverviewSection === 'inventory' ? 'active' : ''}
+                    className={`nav-tab ${activeOverviewSection === 'inventory' ? 'active' : ''}`}
                     onClick={() => setActiveOverviewSection('inventory')}
                   >
-                    Inventory Management
+                    Inventory
                   </button>
                   <button 
-                    className={activeOverviewSection === 'units' ? 'active' : ''}
+                    className={`nav-tab ${activeOverviewSection === 'units' ? 'active' : ''}`}
                     onClick={() => setActiveOverviewSection('units')}
                   >
-                    Unit Configuration
+                    Units
                   </button>
                   <button 
-                    className={activeOverviewSection === 'reports' ? 'active' : ''}
+                    className={`nav-tab ${activeOverviewSection === 'reports' ? 'active' : ''}`}
                     onClick={() => setActiveOverviewSection('reports')}
                   >
                     Analytics
                   </button>
                   <button 
-                    className={activeOverviewSection === 'distributions' ? 'active' : ''}
+                    className={`nav-tab ${activeOverviewSection === 'distributions' ? 'active' : ''}`}
                     onClick={() => setActiveOverviewSection('distributions')}
                   >
-                    Distribution History
+                    Distributions
                   </button>
                 </div>
 
@@ -1175,22 +1288,25 @@ System Health Check:
                   <h2>Current Inventory Distribution</h2>
                         <div className="unit-toggle">
                           <span className="toggle-label">Display as:</span>
-                          <div className="toggle-buttons">
+                          <div className="nav-with-icons" style={{ display: 'inline-flex', marginLeft: '12px' }}>
                             <button 
-                              className={`toggle-btn ${orderingUnit === 'pounds' ? 'active' : ''}`}
+                              className={`nav-tab ${orderingUnit === 'pounds' ? 'active' : ''}`}
                               onClick={() => setOrderingUnit('pounds')}
+                              style={{ padding: '6px 12px', minHeight: '32px' }}
                             >
                               Pounds
                             </button>
                             <button 
-                              className={`toggle-btn ${orderingUnit === 'cases' ? 'active' : ''}`}
+                              className={`nav-tab ${orderingUnit === 'cases' ? 'active' : ''}`}
                               onClick={() => setOrderingUnit('cases')}
+                              style={{ padding: '6px 12px', minHeight: '32px' }}
                             >
                               Cases
                             </button>
                             <button 
-                              className={`toggle-btn ${orderingUnit === 'pallets' ? 'active' : ''}`}
+                              className={`nav-tab ${orderingUnit === 'pallets' ? 'active' : ''}`}
                               onClick={() => setOrderingUnit('pallets')}
+                              style={{ padding: '6px 12px', minHeight: '32px' }}
                             >
                               Pallets
                             </button>
@@ -1230,16 +1346,16 @@ System Health Check:
                       <div className="alerts-feed">
                         {getCriticalAlerts.length === 0 ? (
                           <div className="no-alerts">
-                            <p>✅ No critical alerts at this time</p>
+                            <p>No critical alerts at this time</p>
                             <p>All systems are operating within normal parameters.</p>
                           </div>
                         ) : (
                           getCriticalAlerts.slice(0, 8).map((alert, index) => (
                             <div key={index} className={`alert-item ${alert.type.toLowerCase()}`}>
                               <div className="alert-icon">
-                                {alert.type === 'CRITICAL' && '🚨'}
-                                {alert.type === 'WARNING' && '⚠️'}
-                                {alert.type === 'INFO' && '💡'}
+                                {alert.type === 'CRITICAL' && 'CRITICAL'}
+                                {alert.type === 'WARNING' && 'WARNING'}
+                                {alert.type === 'INFO' && 'INFO'}
                           </div>
                               <div className="alert-content">
                                 <p className="alert-message">{alert.message}</p>
@@ -1258,28 +1374,28 @@ System Health Check:
                   <h2>Quick Actions</h2>
                   <div className="quick-actions">
                     <button 
-                      className="action-btn primary"
+                      className="btn btn-primary"
                           onClick={() => setActiveTab('dataentry')}
                     >
-                      📝 Add Inventory
+                      Add Inventory
                     </button>
                     <button 
-                      className="action-btn secondary"
+                      className="btn btn-secondary"
                       onClick={() => setActiveTab('myplate')}
                     >
-                      📊 Check MyPlate
+                      Check MyPlate
                     </button>
                     <button 
-                      className="action-btn secondary"
+                      className="btn btn-secondary"
                           onClick={() => setActiveOverviewSection('inventory')}
                     >
-                          📦 Manage Inventory
+                          Manage Inventory
                     </button>
                     <button 
-                      className="action-btn danger"
+                      className="btn btn-danger"
                       onClick={resetAllData}
                     >
-                      🗑️ Reset All Data
+                      Reset All Data
                     </button>
                   </div>
                 </div>
@@ -1289,13 +1405,13 @@ System Health Check:
                       <div className="distribution-feed">
                         {distributionHistory.length === 0 ? (
                           <div className="no-distributions">
-                            <p>📦 No distributions recorded yet</p>
+                            <p>No distributions recorded yet</p>
                             <p>Start recording distributions to track outgoing food.</p>
               </div>
                         ) : (
                           distributionHistory.slice(0, 5).map((distribution, index) => (
                             <div key={index} className="distribution-item">
-                              <div className="distribution-icon">📤</div>
+                              <div className="distribution-icon">OUT</div>
                               <div className="distribution-content">
                                 <p className="distribution-message">
                                   {distribution.totalDistributed?.toFixed(1)} lbs to {distribution.recipient}
@@ -1313,8 +1429,9 @@ System Health Check:
           </div>
                       {distributionHistory.length > 5 && (
                         <button 
-                          className="view-all-btn"
+                          className="btn btn-secondary"
                           onClick={() => setActiveOverviewSection('distributions')}
+                          style={{ marginTop: '16px' }}
                         >
                           View All Distributions
                         </button>
@@ -1413,8 +1530,8 @@ System Health Check:
                       {distributionHistory.length === 0 ? (
                         <div className="empty-state">
                           <p>No distributions recorded yet. Start tracking outgoing food distributions.</p>
-                          <button 
-                            className="get-started-btn"
+                                                      <button 
+                            className="btn btn-primary"
                             onClick={() => setActiveTab('dataentry')}
                           >
                             Record First Distribution
@@ -1453,24 +1570,13 @@ System Health Check:
 
         {activeTab === 'dataentry' && (
           <div className="data-entry-tab">
-            <div className="data-entry-nav">
-              <button 
-                className="tab-btn active"
-                onClick={() => {/* Could add sub-tabs for intake vs distribution */}}
-              >
-                Intake & Distribution
-              </button>
-            </div>
-            <div className="data-entry-content">
-              <div className="entry-section">
-                <h3>Record Intake</h3>
-                <SurveyInterface onDataSubmit={handleSurveySubmit} />
-              </div>
-              <div className="entry-section">
-                <h3>Record Distribution</h3>
-                <DistributionInterface onDataSubmit={handleSurveySubmit} />
-              </div>
-            </div>
+            <SurveyInterface onDataSubmit={handleSurveySubmit} />
+          </div>
+        )}
+
+        {activeTab === 'distribution' && (
+          <div className="distribution-tab">
+            <DistributionInterface onDataSubmit={handleSurveySubmit} />
           </div>
         )}
 
@@ -1483,7 +1589,7 @@ System Health Check:
       {storageStatus !== 'healthy' && (
         <div className={`storage-status ${storageStatus}`}>
           <div>
-            {storageStatus === 'error' ? '⚠️ Storage Error' : '⚠️ Storage Warning'}
+            {storageStatus === 'error' ? 'Storage Error' : 'Storage Warning'}
           </div>
           {lastBackupTime && (
             <div className={`backup-indicator ${Date.now() - lastBackupTime.getTime() < 600000 ? 'recent' : ''}`}>
@@ -1492,6 +1598,16 @@ System Health Check:
           )}
         </div>
       )}
+
+      {/* Phase 7A: Enhanced Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={confirmationDialog.isOpen}
+        onClose={closeConfirmation}
+        onConfirm={confirmationDialog.onConfirm}
+        title={confirmationDialog.title}
+        message={confirmationDialog.message}
+        type={confirmationDialog.type}
+      />
     </div>
   );
 };

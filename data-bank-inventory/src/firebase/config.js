@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 
-// Check if we're using environment variables or demo mode
+// if nothing is there ask me for the values
 const isUsingEnvVars = process.env.REACT_APP_FIREBASE_API_KEY && 
                       process.env.REACT_APP_FIREBASE_PROJECT_ID;
 
@@ -16,7 +16,7 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_FIREBASE_APP_ID || "1:123456789:web:abcdef123456"
 };
 
-// Log configuration status
+// Log config
 if (process.env.NODE_ENV === 'development') {
   if (isUsingEnvVars) {
     console.log('🔥 Firebase: Using environment variables from .env file');
@@ -27,7 +27,7 @@ if (process.env.NODE_ENV === 'development') {
   }
 }
 
-// Initialize Firebase
+
 let app;
 try {
   app = initializeApp(firebaseConfig);

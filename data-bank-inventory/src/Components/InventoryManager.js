@@ -216,7 +216,7 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
 
       {totalFromSummary === 0 ? (
         <div className="empty-state">
-          <h3>📦 No Inventory Data</h3>
+                          <h3>No Inventory Data</h3>
           <p>Start by adding your first inventory items using the "Data Entry" tab, or add individual items below.</p>
           <button
             onClick={() => onNavigate('survey')}
@@ -250,7 +250,7 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
               <div className="alerts-list">
                 {alerts.map((alert, index) => (
                   <div key={index} className={`alert alert-${alert.severity}`}>
-                    <span className="alert-icon">⚠️</span>
+                    <span className="alert-icon">WARNING</span>
                     <span className="alert-message">{alert.message}</span>
                     <span className="alert-weight">{alert.item.weight} lbs</span>
                   </div>
