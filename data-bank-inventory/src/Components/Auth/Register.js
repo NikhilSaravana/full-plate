@@ -40,7 +40,7 @@ const Register = () => {
       setLoading(true);
       await signup(formData.email, formData.password, formData.name);
     } catch (error) {
-      setError('Failed to create an account');
+      setError(error.message || 'Failed to create an account');
     }
 
     setLoading(false);

@@ -288,7 +288,8 @@ export const UnitConverters = {
   
   convertToStandardWeight: (quantity, unitType, category = null) => {
     const configs = UnitConverters.getUnitConfigs();
-    const config = configs[unitType];
+    const unitKey = unitType.toUpperCase();
+    const config = configs[unitKey];
     if (!config) return quantity;
     
     const weight = category && config.categorySpecific[category] 
@@ -299,7 +300,8 @@ export const UnitConverters = {
   
   convertFromStandardWeight: (weightInPounds, unitType, category = null) => {
     const configs = UnitConverters.getUnitConfigs();
-    const config = configs[unitType];
+    const unitKey = unitType.toUpperCase();
+    const config = configs[unitKey];
     if (!config) return weightInPounds;
     
     const weight = category && config.categorySpecific[category] 
@@ -311,7 +313,7 @@ export const UnitConverters = {
   getAvailableUnits: () => {
     const configs = UnitConverters.getUnitConfigs();
     return Object.entries(configs).map(([key, config]) => ({
-      key,
+      key: key.toUpperCase(),
       name: config.name,
       abbreviation: config.abbreviation
     }));

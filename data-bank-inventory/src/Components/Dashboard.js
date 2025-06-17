@@ -328,7 +328,10 @@ const Dashboard = () => {
       const result = await firestoreService.saveInventory(currentUser.uid, inventoryData);
       if (result.success) {
         setLastSyncTime(new Date());
-        showAutoSaveStatus('Inventory saved to cloud');
+        // Only show message if there was a previous error or if this is a recovery sync
+        if (syncStatus === 'error' || pendingChanges) {
+          showAutoSaveStatus('Inventory synced with cloud');
+        }
       } else {
         setPendingChanges(true);
         showAutoSaveStatus('Saved locally (will sync when online)', false);
@@ -336,6 +339,7 @@ const Dashboard = () => {
     } catch (error) {
       setPendingChanges(true);
       console.error('Cloud save error:', error);
+      showAutoSaveStatus('Failed to save to cloud', true);
     }
   };
 
@@ -497,7 +501,8 @@ const Dashboard = () => {
   const getUnitWeight = (category, unit) => {
     if (!unitConfigurations) return 1;
     
-    const config = unitConfigurations[unit.toUpperCase()];
+    const unitKey = unit.toUpperCase();
+    const config = unitConfigurations[unitKey];
     if (!config) return 1;
     
     // Check for category-specific weight first
@@ -510,8 +515,6 @@ const Dashboard = () => {
   };
 
   const convertFromPounds = (weightInPounds, category, targetUnit) => {
-    if (targetUnit === 'pounds') return weightInPounds;
-    
     const unitWeight = getUnitWeight(category, targetUnit);
     return weightInPounds / unitWeight;
   };
@@ -519,11 +522,12 @@ const Dashboard = () => {
   const formatInventoryValue = (weightInPounds, category) => {
     const converted = convertFromPounds(weightInPounds, category, orderingUnit);
     
-    if (orderingUnit === 'pounds') {
+    const unitKey = orderingUnit.toUpperCase();
+    if (unitKey === 'POUNDS') {
       return `${converted.toLocaleString()} lbs`;
-    } else if (orderingUnit === 'cases') {
+    } else if (unitKey === 'CASES') {
       return `${converted.toFixed(1)} cases`;
-    } else if (orderingUnit === 'pallets') {
+    } else if (unitKey === 'PALLETS') {
       return `${converted.toFixed(2)} pallets`;
     }
     
@@ -531,17 +535,39 @@ const Dashboard = () => {
   };
 
   const getUnitAbbreviation = () => {
-    switch (orderingUnit) {
-      case 'pounds': return 'lbs';
-      case 'cases': return 'cases';
-      case 'pallets': return 'pallets';
+    const unitKey = orderingUnit.toUpperCase();
+    switch (unitKey) {
+      case 'POUNDS': return 'lbs';
+      case 'CASES': return 'cases';
+      case 'PALLETS': return 'pallets';
       default: return orderingUnit;
     }
   };
 
   const showAutoSaveStatus = (message, isError = false) => {
-    setAutoSaveStatus({ message, isError });
-    setTimeout(() => setAutoSaveStatus(''), 1500);
+    // Always show error messages
+    if (isError) {
+      setAutoSaveStatus({ message, isError });
+      setTimeout(() => setAutoSaveStatus(''), 3000);
+      return;
+    }
+
+    // Only show non-error messages for significant events
+    const significantEvents = [
+      'Failed to connect to cloud',
+      'Sync error',
+      'Failed to save to cloud',
+      'Export failed',
+      'Import failed',
+      'Data imported',
+      'Backup exported',
+      'All data has been reset'
+    ];
+
+    if (significantEvents.some(event => message.includes(event))) {
+      setAutoSaveStatus({ message, isError });
+      setTimeout(() => setAutoSaveStatus(''), 2000);
+    }
   };
 
   // Enhanced export with Firebase data

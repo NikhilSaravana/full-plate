@@ -231,7 +231,9 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
           <div className="inventory-summary">
             <h3>Inventory Summary (by Category)</h3>
             <div className="summary-grid">
-              {Object.entries(currentInventory || {}).map(([category, weight]) => (
+              {Object.entries(currentInventory || {})
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([category, weight]) => (
                 <div key={category} className="summary-card">
                   <h4>{category}</h4>
                   <p className="summary-weight">{weight.toLocaleString()} lbs</p>
