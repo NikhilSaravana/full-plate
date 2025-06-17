@@ -7,6 +7,7 @@ import DistributionInterface from './DistributionInterface';
 import UnitConfiguration from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
 import firestoreService from '../services/firestoreService';
+import { UnitConverters } from './UnitConfiguration';
 
 // Default unit configurations for inventory units
 const DEFAULT_UNIT_CONFIGS = {
@@ -76,8 +77,7 @@ const Dashboard = () => {
   });
 
   // Unit Toggle System for ordering calculations
-  const [orderingUnit, setOrderingUnit] = useState('POUNDS'); // Default to POUNDS
-  const [unitConfigurations, setUnitConfigurations] = useState(DEFAULT_UNIT_CONFIGS);
+  const [orderingUnit, setOrderingUnit] = useState('POUND'); // Default to POUND
 
   // Enhanced Local Storage Management
   const [storageStatus, setStorageStatus] = useState('healthy');
@@ -195,7 +195,6 @@ const Dashboard = () => {
         inventory: currentInventory,
         activity: recentActivity,
         distributions: distributionHistory,
-        unitConfigurations: unitConfigurations,
         orderingUnit: orderingUnit,
         timestamp: new Date().toISOString(),
         version: '2.0'
@@ -299,7 +298,6 @@ const Dashboard = () => {
         if (prefsResult.success) {
           const prefs = prefsResult.data;
           if (prefs.orderingUnit) setOrderingUnit(prefs.orderingUnit);
-          if (prefs.unitConfigurations) setUnitConfigurations(prefs.unitConfigurations);
           
           if (!prefsResult.isDefault) {
             showAutoSaveStatus('Preferences loaded');
@@ -420,8 +418,6 @@ const Dashboard = () => {
       const savedActivity = safeLocalStorageGet('foodBankActivity', []);
       const savedDistributions = safeLocalStorageGet('distributionHistory', []);
       const hasBeenSetup = safeLocalStorageGet('foodBankSetupComplete');
-      const savedUnitConfigs = safeLocalStorageGet('unitConfigurations');
-      const savedOrderingUnit = safeLocalStorageGet('orderingUnit', 'pounds');
 
       // Validate and load inventory
       if (savedInventory && validateData(savedInventory, 'inventory')) {
@@ -441,10 +437,6 @@ const Dashboard = () => {
       if (hasBeenSetup) {
         setIsFirstTime(false);
       }
-      if (savedUnitConfigs) {
-        setUnitConfigurations(savedUnitConfigs);
-      }
-      setOrderingUnit(savedOrderingUnit);
 
       setStorageStatus('healthy');
     } catch (error) {
@@ -492,20 +484,9 @@ const Dashboard = () => {
     safeLocalStorageSet('orderingUnit', orderingUnit);
     // Save preferences to cloud
     if (currentUser && connectionStatus.connected) {
-      savePreferencesToCloud({ orderingUnit, unitConfigurations });
+      savePreferencesToCloud({ orderingUnit });
     }
   }, [orderingUnit]);
-
-  // Save unit configurations
-  useEffect(() => {
-    if (unitConfigurations) {
-      safeLocalStorageSet('unitConfigurations', unitConfigurations);
-      // Save preferences to cloud
-      if (currentUser && connectionStatus.connected) {
-        savePreferencesToCloud({ orderingUnit, unitConfigurations });
-      }
-    }
-  }, [unitConfigurations]);
 
   const updateOutgoingMetrics = () => {
     const today = new Date().toISOString().split('T')[0];
@@ -537,9 +518,8 @@ const Dashboard = () => {
 
   // Unit conversion functions
   const getUnitWeight = (category, unit) => {
-    if (!unitConfigurations) return 1;
     const unitKey = unit.toUpperCase();
-    const config = unitConfigurations[unitKey];
+    const config = DEFAULT_UNIT_CONFIGS[unitKey];
     if (!config) return 1;
     let weight;
     if (config.categorySpecific && config.categorySpecific[category]) {
@@ -559,24 +539,26 @@ const Dashboard = () => {
   };
 
   const formatInventoryValue = (weightInPounds, category) => {
-    const converted = convertFromPounds(weightInPounds, category, orderingUnit);
-    const unitKey = orderingUnit.toUpperCase();
-    if (unitKey === 'POUNDS') {
+    const unitKey = (orderingUnit || 'POUND').toUpperCase();
+    let converted = weightInPounds;
+    if (unitKey !== 'POUND') {
+      converted = UnitConverters.convertFromStandardWeight(weightInPounds, unitKey, category);
+    }
+    if (unitKey === 'POUND') {
       return `${converted.toLocaleString()} lbs`;
-    } else if (unitKey === 'CASES') {
+    } else if (unitKey === 'CASE') {
       return `${converted < 1 ? converted.toFixed(3) : converted.toFixed(1)} cases`;
-    } else if (unitKey === 'PALLETS') {
+    } else if (unitKey === 'PALLET') {
       return `${converted < 1 ? converted.toFixed(3) : converted.toFixed(2)} pallets`;
     }
     return `${converted.toLocaleString()} ${orderingUnit}`;
   };
 
   const getUnitAbbreviation = () => {
-    const unitKey = orderingUnit.toUpperCase();
-    switch (unitKey) {
-      case 'POUNDS': return 'lbs';
-      case 'CASES': return 'cases';
-      case 'PALLETS': return 'pallets';
+    switch (orderingUnit) {
+      case 'pounds': return 'lbs';
+      case 'cases': return 'cases';
+      case 'pallets': return 'pallets';
       default: return orderingUnit;
     }
   };
@@ -616,7 +598,6 @@ const Dashboard = () => {
         inventory: currentInventory,
         activity: recentActivity,
         distributions: distributionHistory,
-        unitConfigurations: unitConfigurations,
         orderingUnit: orderingUnit,
         detailedInventory: safeLocalStorageGet('detailedInventory', {}),
         setupComplete: safeLocalStorageGet('foodBankSetupComplete', 'false'),
@@ -678,8 +659,6 @@ const Dashboard = () => {
           if (importedData.inventory) setCurrentInventory(importedData.inventory);
           if (importedData.activity) setRecentActivity(importedData.activity);
           if (importedData.distributions) setDistributionHistory(importedData.distributions);
-          if (importedData.unitConfigurations) setUnitConfigurations(importedData.unitConfigurations);
-          if (importedData.orderingUnit) setOrderingUnit(importedData.orderingUnit);
           
           // Restore localStorage data
           if (importedData.detailedInventory) {
@@ -900,26 +879,6 @@ System Health Check:
     return memoizedMyPlateCompliance;
   };
 
-  const getMyPlateComplianceData = () => {
-    const total = memoizedTotalInventory;
-    if (total === 0) return { compliantCategories: 0 };
-
-    const vegPercentage = (currentInventory.VEG / total) * 100;
-    const fruitPercentage = (currentInventory.FRUIT / total) * 100;
-    const proteinPercentage = (currentInventory.PROTEIN / total) * 100;
-    const dairyPercentage = (currentInventory.DAIRY / total) * 100;
-    const grainPercentage = (currentInventory.GRAIN / total) * 100;
-    
-    const vegOK = vegPercentage >= 13 && vegPercentage <= 17;
-    const fruitOK = fruitPercentage >= 13 && fruitPercentage <= 17;
-    const proteinOK = proteinPercentage >= 18 && proteinPercentage <= 22;
-    const dairyOK = dairyPercentage >= 2 && dairyPercentage <= 4;
-    const grainOK = grainPercentage >= 13 && grainPercentage <= 17;
-    
-    const compliantCategories = [vegOK, fruitOK, proteinOK, dairyOK, grainOK].filter(Boolean).length;
-    return { compliantCategories };
-  };
-
   const getNutritionalScore = () => {
     const total = memoizedTotalInventory;
     if (total === 0) return 'No data yet';
@@ -1012,7 +971,22 @@ System Health Check:
     });
 
     // MyPlate compliance alerts
-    const myplateCompliance = getMyPlateComplianceData();
+    const myplateCompliance = { compliantCategories: 0 };
+    if (total > 0) {
+      const vegPercentage = (currentInventory.VEG / total) * 100;
+      const fruitPercentage = (currentInventory.FRUIT / total) * 100;
+      const proteinPercentage = (currentInventory.PROTEIN / total) * 100;
+      const dairyPercentage = (currentInventory.DAIRY / total) * 100;
+      const grainPercentage = (currentInventory.GRAIN / total) * 100;
+      
+      const vegOK = vegPercentage >= 13 && vegPercentage <= 17;
+      const fruitOK = fruitPercentage >= 13 && fruitPercentage <= 17;
+      const proteinOK = proteinPercentage >= 18 && proteinPercentage <= 22;
+      const dairyOK = dairyPercentage >= 2 && dairyPercentage <= 4;
+      const grainOK = grainPercentage >= 13 && grainPercentage <= 17;
+      
+      myplateCompliance.compliantCategories = [vegOK, fruitOK, proteinOK, dairyOK, grainOK].filter(Boolean).length;
+    }
     if (myplateCompliance.compliantCategories < 3) {
       alerts.push({
         type: 'WARNING',
@@ -1332,9 +1306,9 @@ System Health Check:
                           <span className="text-sm font-medium text-gray-700">Show in:</span>
                           <div className="flex rounded-md shadow-sm">
                             <button
-                              onClick={() => setOrderingUnit('POUNDS')}
+                              onClick={() => setOrderingUnit('POUND')}
                               className={`px-3 py-1 text-sm font-medium rounded-l-md ${
-                                orderingUnit === 'POUNDS'
+                                orderingUnit === 'POUND'
                                   ? 'bg-blue-600 text-white'
                                   : 'bg-white text-gray-700 hover:bg-gray-50'
                               }`}
@@ -1342,9 +1316,9 @@ System Health Check:
                               Pounds
                             </button>
                             <button
-                              onClick={() => setOrderingUnit('CASES')}
+                              onClick={() => setOrderingUnit('CASE')}
                               className={`px-3 py-1 text-sm font-medium ${
-                                orderingUnit === 'CASES'
+                                orderingUnit === 'CASE'
                                   ? 'bg-blue-600 text-white'
                                   : 'bg-white text-gray-700 hover:bg-gray-50'
                               }`}
@@ -1352,9 +1326,9 @@ System Health Check:
                               Cases
                             </button>
                             <button
-                              onClick={() => setOrderingUnit('PALLETS')}
+                              onClick={() => setOrderingUnit('PALLET')}
                               className={`px-3 py-1 text-sm font-medium rounded-r-md ${
-                                orderingUnit === 'PALLETS'
+                                orderingUnit === 'PALLET'
                                   ? 'bg-blue-600 text-white'
                                   : 'bg-white text-gray-700 hover:bg-gray-50'
                               }`}
@@ -1503,8 +1477,7 @@ System Health Check:
                 {activeOverviewSection === 'units' && (
                   <UnitConfiguration 
                     onConfigurationChange={(configs) => {
-                      setUnitConfigurations(configs);
-                      safeLocalStorageSet('unitConfigurations', configs);
+                      setOrderingUnit(configs.orderingUnit);
                     }}
                   />
                 )}
