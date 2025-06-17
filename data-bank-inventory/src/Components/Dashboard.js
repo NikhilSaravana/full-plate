@@ -8,6 +8,44 @@ import UnitConfiguration from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
 import firestoreService from '../services/firestoreService';
 
+// Default unit configurations for inventory units
+const DEFAULT_UNIT_CONFIGS = {
+  PALLET: {
+    name: 'Pallet',
+    abbreviation: 'PLT',
+    baseWeight: 1500, // Default average pallet weight in lbs
+    categorySpecific: {
+      'DAIRY': 1200,
+      'GRAIN': 1400,
+      'PROTEIN': 1600,
+      'FRUIT': 1300,
+      'VEG': 1450,
+      'PRODUCE': 1100,
+      'MISC': 1500
+    }
+  },
+  CASE: {
+    name: 'Case',
+    abbreviation: 'CS',
+    baseWeight: 25, // Default case weight in lbs
+    categorySpecific: {
+      'DAIRY': 30,
+      'GRAIN': 20,
+      'PROTEIN': 35,
+      'FRUIT': 25,
+      'VEG': 28,
+      'PRODUCE': 22,
+      'MISC': 25
+    }
+  },
+  POUNDS: {
+    name: 'Pounds',
+    abbreviation: 'LB',
+    baseWeight: 1,
+    categorySpecific: {}
+  }
+};
+
 const Dashboard = () => {
   const { currentUser, logout } = useAuth();
 
@@ -38,8 +76,8 @@ const Dashboard = () => {
   });
 
   // Unit Toggle System for ordering calculations
-  const [orderingUnit, setOrderingUnit] = useState('pounds'); // 'pounds', 'cases', 'pallets'
-  const [unitConfigurations, setUnitConfigurations] = useState(null);
+  const [orderingUnit, setOrderingUnit] = useState('POUNDS'); // Default to POUNDS
+  const [unitConfigurations, setUnitConfigurations] = useState(DEFAULT_UNIT_CONFIGS);
 
   // Enhanced Local Storage Management
   const [storageStatus, setStorageStatus] = useState('healthy');
@@ -500,37 +538,36 @@ const Dashboard = () => {
   // Unit conversion functions
   const getUnitWeight = (category, unit) => {
     if (!unitConfigurations) return 1;
-    
     const unitKey = unit.toUpperCase();
     const config = unitConfigurations[unitKey];
     if (!config) return 1;
-    
-    // Check for category-specific weight first
+    let weight;
     if (config.categorySpecific && config.categorySpecific[category]) {
-      return config.categorySpecific[category];
+      weight = config.categorySpecific[category];
+    } else {
+      weight = config.baseWeight || 1;
     }
-    
-    // Fall back to base weight
-    return config.baseWeight || 1;
+    // Debug log
+    console.log(`[UnitConversion] Category: ${category}, Unit: ${unitKey}, Weight used: ${weight}`);
+    return weight;
   };
 
   const convertFromPounds = (weightInPounds, category, targetUnit) => {
+    // Always use the latest unitConfigurations for conversion
     const unitWeight = getUnitWeight(category, targetUnit);
     return weightInPounds / unitWeight;
   };
 
   const formatInventoryValue = (weightInPounds, category) => {
     const converted = convertFromPounds(weightInPounds, category, orderingUnit);
-    
     const unitKey = orderingUnit.toUpperCase();
     if (unitKey === 'POUNDS') {
       return `${converted.toLocaleString()} lbs`;
     } else if (unitKey === 'CASES') {
-      return `${converted.toFixed(1)} cases`;
+      return `${converted < 1 ? converted.toFixed(3) : converted.toFixed(1)} cases`;
     } else if (unitKey === 'PALLETS') {
-      return `${converted.toFixed(2)} pallets`;
+      return `${converted < 1 ? converted.toFixed(3) : converted.toFixed(2)} pallets`;
     }
-    
     return `${converted.toLocaleString()} ${orderingUnit}`;
   };
 
@@ -1179,33 +1216,12 @@ System Health Check:
         
         {/* Phase 7A: Enhanced Utility Controls with Tooltips */}
         <div className="nav-utils">
-                      <div className="tooltip-wrapper">
-            <button onClick={exportAllData} className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px' }}>
-              Export
-          </button>
-            <div className="tooltip">Export Data Backup</div>
-          </div>
-          
-          <div className="tooltip-wrapper">
-            <label className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px', cursor: 'pointer' }}>
-              Import
-            <input
-              type="file"
-              accept=".json"
-              onChange={importData}
-              style={{ display: 'none' }}
-            />
-          </label>
-            <div className="tooltip">Import Data</div>
-          </div>
-          
           <div className="tooltip-wrapper">
             <button onClick={performSystemHealthCheck} className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px' }}>
               Check
           </button>
             <div className="tooltip">System Health Check</div>
           </div>
-          
           <div className="tooltip-wrapper">
             <button onClick={resetAllData} className="btn btn-danger" style={{ minWidth: 'auto', padding: '8px 12px' }}>
               Reset
@@ -1312,27 +1328,36 @@ System Health Check:
                 <div className="overview-section">
                       <div className="section-header">
                   <h2>Current Inventory Distribution</h2>
-                        <div className="unit-toggle">
-                          <span className="toggle-label">Display as:</span>
-                          <div className="nav-with-icons" style={{ display: 'inline-flex', marginLeft: '12px' }}>
-                            <button 
-                              className={`nav-tab ${orderingUnit === 'pounds' ? 'active' : ''}`}
-                              onClick={() => setOrderingUnit('pounds')}
-                              style={{ padding: '6px 12px', minHeight: '32px' }}
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-gray-700">Show in:</span>
+                          <div className="flex rounded-md shadow-sm">
+                            <button
+                              onClick={() => setOrderingUnit('POUNDS')}
+                              className={`px-3 py-1 text-sm font-medium rounded-l-md ${
+                                orderingUnit === 'POUNDS'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                              }`}
                             >
                               Pounds
                             </button>
-                            <button 
-                              className={`nav-tab ${orderingUnit === 'cases' ? 'active' : ''}`}
-                              onClick={() => setOrderingUnit('cases')}
-                              style={{ padding: '6px 12px', minHeight: '32px' }}
+                            <button
+                              onClick={() => setOrderingUnit('CASES')}
+                              className={`px-3 py-1 text-sm font-medium ${
+                                orderingUnit === 'CASES'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                              }`}
                             >
                               Cases
                             </button>
-                            <button 
-                              className={`nav-tab ${orderingUnit === 'pallets' ? 'active' : ''}`}
-                              onClick={() => setOrderingUnit('pallets')}
-                              style={{ padding: '6px 12px', minHeight: '32px' }}
+                            <button
+                              onClick={() => setOrderingUnit('PALLETS')}
+                              className={`px-3 py-1 text-sm font-medium rounded-r-md ${
+                                orderingUnit === 'PALLETS'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                              }`}
                             >
                               Pallets
                             </button>

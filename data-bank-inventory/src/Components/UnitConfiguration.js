@@ -41,25 +41,31 @@ const DEFAULT_UNIT_CONFIGS = {
 const UnitConfiguration = ({ onConfigurationChange }) => {
   const [configurations, setConfigurations] = useState({
     PALLET: {
-      baseWeight: 2000,
+      name: 'Pallet',
+      abbreviation: 'PLT',
+      baseWeight: 1500,
       categorySpecific: {
-        'Canned Goods': 2200,
-        'Dry Goods': 1800,
-        'Fresh Produce': 1500,
-        'Dairy': 1600,
-        'Meat': 1700,
-        'Bakery': 1400
+        'GRAIN': 1400,
+        'PROTEIN': 1600,
+        'DAIRY': 1200,
+        'FRUIT': 1300,
+        'VEG': 1450,
+        'PRODUCE': 1100,
+        'MISC': 1500
       }
     },
     CASE: {
-      baseWeight: 50,
+      name: 'Case',
+      abbreviation: 'CS',
+      baseWeight: 25,
       categorySpecific: {
-        'Canned Goods': 60,
-        'Dry Goods': 45,
-        'Fresh Produce': 40,
-        'Dairy': 35,
-        'Meat': 55,
-        'Bakery': 30
+        'GRAIN': 20,
+        'PROTEIN': 35,
+        'DAIRY': 30,
+        'FRUIT': 25,
+        'VEG': 28,
+        'PRODUCE': 22,
+        'MISC': 25
       }
     },
     POUNDS: {
@@ -162,7 +168,7 @@ const UnitConfiguration = ({ onConfigurationChange }) => {
       </div>
 
       <div className="unit-tabs">
-        {Object.keys(configurations).map(unitType => (
+        {["PALLET", "CASE"].map(unitType => (
           <button
             key={unitType}
             className={`unit-tab ${selectedUnit === unitType ? 'active' : ''}`}
@@ -175,7 +181,7 @@ const UnitConfiguration = ({ onConfigurationChange }) => {
 
       <div className="unit-details">
         <div className="unit-overview">
-          <h3>{configurations[selectedUnit].name} Configuration</h3>
+          <h3>{selectedUnit === 'PALLET' ? 'Pallet Configuration' : 'Case Configuration'}</h3>
           <div className="base-weight-config">
             <label>Base Weight (Default):</label>
             {isEditing ? (
