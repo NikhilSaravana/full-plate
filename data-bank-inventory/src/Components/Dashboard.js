@@ -8,6 +8,7 @@ import UnitConfiguration from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
 import firestoreService from '../services/firestoreService';
 import { UnitConverters } from './UnitConfiguration';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // Default unit configurations for inventory units
 const DEFAULT_UNIT_CONFIGS = {
@@ -99,6 +100,23 @@ const Dashboard = () => {
   const [connectionStatus, setConnectionStatus] = useState({ connected: false });
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [pendingChanges, setPendingChanges] = useState(false);
+
+  // Pie chart colors
+  const PIE_COLORS = [
+    '#2c5aa0', // Blue
+    '#28a745', // Green
+    '#ffc107', // Yellow
+    '#dc3545', // Red
+    '#17a2b8', // Teal
+    '#6f42c1', // Purple
+    '#fd7e14', // Orange
+    '#343a40', // Dark
+  ];
+
+  // Prepare data for pie chart
+  const pieData = Object.entries(currentInventory)
+    .filter(([category, weight]) => weight > 0)
+    .map(([category, weight]) => ({ name: category, value: weight }));
 
   // Enhanced data validation and error handling
   const validateData = (data, type) => {
@@ -1176,6 +1194,29 @@ System Health Check:
                           </div>
                         </div>
                       </div>
+                  {/* Pie Chart Section */}
+                  <div style={{ width: '100%', height: 320, margin: '32px 0' }}>
+                    <ResponsiveContainer>
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={110}
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => `${value.toLocaleString()} lbs`} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* End Pie Chart Section */}
                   <div className="category-grid">
                     {Object.entries(currentInventory).map(([category, weight]) => {
                       const total = getTotalInventory();
