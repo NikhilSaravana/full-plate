@@ -11,12 +11,12 @@ const SurveyInterface = ({ onDataSubmit }) => {
     notes: ''
   });
   const [items, setItems] = useState([
-    { foodType: '', quantity: '', unit: 'POUNDS', expirationDate: '', notes: '' }
+    { foodType: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }
   ]);
   const [bulkData, setBulkData] = useState('');
   const [distributionData, setDistributionData] = useState({
     totalDistributed: '',
-    unit: 'POUNDS',
+    unit: 'POUND',
     clientsServed: '',
     avgFamilySize: '3',
     categories: {}
@@ -27,7 +27,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
   const availableUnits = UnitConverters.getAvailableUnits();
 
   const addItem = () => {
-    setItems([...items, { foodType: '', quantity: '', unit: 'POUNDS', expirationDate: '', notes: '' }]);
+    setItems([...items, { foodType: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }]);
   };
 
   const removeItem = (index) => {
@@ -42,7 +42,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
 
   const getWeightInPounds = (quantity, unit, category = null) => {
     if (!quantity || !unit) return 0;
-    if (unit === 'POUNDS') return parseFloat(quantity);
+    if (unit === 'POUND') return parseFloat(quantity);
     return UnitConverters.convertToStandardWeight(parseFloat(quantity), unit, category);
   };
 
@@ -122,7 +122,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
     }
 
     // Reset form
-    setItems([{ foodType: '', quantity: '', unit: 'POUNDS', expirationDate: '', notes: '' }]);
+    setItems([{ foodType: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }]);
     setFormData({
       date: new Date().toISOString().split('T')[0],
       source: 'Direct Donation',
@@ -130,7 +130,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
     });
     setDistributionData({
       totalDistributed: '',
-      unit: 'POUNDS',
+      unit: 'POUND',
       clientsServed: '',
       avgFamilySize: '3',
       categories: {}
@@ -174,7 +174,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
   const getUnitDisplayWeight = (quantity, unit, category) => {
     if (!quantity || !unit) return '';
     const weightInPounds = getWeightInPounds(quantity, unit, category);
-    if (unit === 'POUNDS') {
+    if (unit === 'POUND') {
       return `${quantity} lbs`;
     }
     return `${quantity} ${availableUnits.find(u => u.key === unit)?.abbreviation} (${weightInPounds.toFixed(1)} lbs)`;
@@ -262,7 +262,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
                     key={item}
                     className="btn btn-light quick-add-item"
                     onClick={() => {
-                      const newItem = { foodType: item, quantity: '', unit: 'POUNDS', expirationDate: '', notes: '' };
+                      const newItem = { foodType: item, quantity: '', unit: 'POUND', expirationDate: '', notes: '' };
                       setItems([...items, newItem]);
                     }}
                   >
@@ -475,7 +475,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
                 ` ${availableUnits.find(u => u.key === distributionData.unit)?.abbreviation}` : 
                 'N/A'
               }</p>
-              {distributionData.unit !== 'POUNDS' && distributionData.totalDistributed && (
+              {distributionData.unit !== 'POUND' && distributionData.totalDistributed && (
                 <p>Total in Pounds: {
                   UnitConverters.convertToStandardWeight(
                     parseFloat(distributionData.totalDistributed), 

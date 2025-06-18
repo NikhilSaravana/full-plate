@@ -110,7 +110,7 @@ class FirestoreService {
 
   async getInventory(userId) {
     try {
-      const docRef = doc(db, COLLECTIONS.INVENTORY, userId);
+      const docRef = doc(db, 'users', userId, 'data', 'inventory');
       const docSnap = await getDoc(docRef);
       return docSnap.exists() ? docSnap.data() : null;
     } catch (error) {

@@ -10,7 +10,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
     notes: ''
   });
   const [items, setItems] = useState([
-    { foodType: '', quantity: '', unit: 'POUNDS', notes: '' }
+    { foodType: '', quantity: '', unit: 'POUND', notes: '' }
   ]);
   const [clientInfo, setClientInfo] = useState({
     clientsServed: '',
@@ -22,7 +22,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
   const availableUnits = UnitConverters.getAvailableUnits();
 
   const addItem = () => {
-    setItems([...items, { foodType: '', quantity: '', unit: 'POUNDS', notes: '' }]);
+    setItems([...items, { foodType: '', quantity: '', unit: 'POUND', notes: '' }]);
   };
 
   const removeItem = (index) => {
@@ -104,7 +104,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
     }
 
     // Reset form
-    setItems([{ foodType: '', quantity: '', unit: 'POUNDS', notes: '' }]);
+    setItems([{ foodType: '', quantity: '', unit: 'POUND', notes: '' }]);
     setFormData({
       date: new Date().toISOString().split('T')[0],
       recipient: '',
@@ -198,12 +198,8 @@ const DistributionInterface = ({ onDataSubmit }) => {
                 <button
                   key={item}
                   onClick={() => {
-                    const emptyIndex = items.findIndex(i => !i.foodType);
-                    if (emptyIndex >= 0) {
-                      updateItem(emptyIndex, 'foodType', item);
-                    } else {
-                      setItems([...items, { foodType: item, quantity: '', unit: 'POUNDS', notes: '' }]);
-                    }
+                    const newItem = { foodType: item, quantity: '', unit: 'POUND', notes: '' };
+                    setItems([...items, newItem]);
                   }}
                   className="btn btn-light quick-add-item"
                 >

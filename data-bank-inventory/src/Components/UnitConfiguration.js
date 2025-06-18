@@ -68,7 +68,9 @@ const UnitConfiguration = ({ onConfigurationChange }) => {
         'MISC': 25
       }
     },
-    POUNDS: {
+    POUND: {
+      name: 'Pound',
+      abbreviation: 'lb',
       baseWeight: 1,
       categorySpecific: {}
     }

@@ -224,193 +224,6 @@ const Dashboard = () => {
     return () => clearInterval(backupInterval);
   }, [currentInventory, recentActivity, distributionHistory]);
 
-  // Firebase Integration and Real-time Sync
-  useEffect(() => {
-    if (!currentUser) return;
-
-    let inventoryUnsubscribe;
-    let distributionsUnsubscribe;
-    let connectionUnsubscribe;
-
-    const setupFirebaseSync = async () => {
-      try {
-        setSyncStatus('connecting');
-
-        // Monitor connection status
-        connectionUnsubscribe = firestoreService.onConnectionStateChange((status) => {
-          setConnectionStatus(status);
-          if (status.connected) {
-            setSyncStatus('connected');
-            syncPendingChanges();
-          } else {
-            setSyncStatus('disconnected');
-          }
-        });
-
-        // Subscribe to real-time inventory updates
-        inventoryUnsubscribe = firestoreService.subscribeToInventory(
-          currentUser.uid,
-          (result) => {
-            if (result.success) {
-              setCurrentInventory(result.data);
-              setLastSyncTime(result.lastUpdated);
-              setSyncStatus(result.syncStatus);
-              
-              // Update local storage as backup
-              safeLocalStorageSet('foodBankInventory', result.data);
-              
-              if (result.syncStatus === 'initialized') {
-                showAutoSaveStatus('Inventory initialized from cloud');
-              } else if (result.syncStatus === 'synced') {
-                showAutoSaveStatus('Inventory synced');
-              }
-            } else {
-              console.error('Inventory sync error:', result.error);
-              setSyncStatus('error');
-              showAutoSaveStatus('Sync error: ' + result.error, true);
-            }
-          }
-        );
-
-        // Subscribe to real-time distribution updates
-        distributionsUnsubscribe = firestoreService.subscribeToDistributions(
-          currentUser.uid,
-          (result) => {
-            if (result.success) {
-              setDistributionHistory(result.data);
-              setLastSyncTime(new Date());
-              
-              // Update local storage as backup
-              safeLocalStorageSet('distributionHistory', result.data);
-              
-              if (result.count > 0) {
-                showAutoSaveStatus(`${result.count} distributions synced`);
-              }
-            } else {
-              console.error('Distributions sync error:', result.error);
-              showAutoSaveStatus('Distribution sync error: ' + result.error, true);
-            }
-          }
-        );
-
-        // Load user preferences
-        const prefsResult = await firestoreService.getUserPreferences(currentUser.uid);
-        if (prefsResult.success) {
-          const prefs = prefsResult.data;
-          if (prefs.orderingUnit) setOrderingUnit(prefs.orderingUnit);
-          
-          if (!prefsResult.isDefault) {
-            showAutoSaveStatus('Preferences loaded');
-          }
-        }
-
-      } catch (error) {
-        console.error('Firebase setup error:', error);
-        setSyncStatus('error');
-        showAutoSaveStatus('Failed to connect to cloud', true);
-      }
-    };
-
-    setupFirebaseSync();
-
-    // Cleanup subscriptions on unmount or user change
-    return () => {
-      if (inventoryUnsubscribe) inventoryUnsubscribe();
-      if (distributionsUnsubscribe) distributionsUnsubscribe();
-      if (connectionUnsubscribe) connectionUnsubscribe();
-      firestoreService.unsubscribeAll(currentUser.uid);
-    };
-  }, [currentUser]);
-
-  // Sync pending changes when connection is restored
-  const syncPendingChanges = async () => {
-    if (!currentUser || !pendingChanges) return;
-
-    try {
-      setSyncStatus('syncing');
-      
-      // Sync inventory if there are pending changes
-      const localInventory = safeLocalStorageGet('foodBankInventory');
-      if (localInventory) {
-        const result = await firestoreService.saveInventory(currentUser.uid, localInventory);
-        if (result.success) {
-          showAutoSaveStatus('Pending inventory synced');
-        }
-      }
-
-      // Sync activity
-      const localActivity = safeLocalStorageGet('foodBankActivity', []);
-      if (localActivity.length > 0) {
-        const result = await firestoreService.saveActivity(currentUser.uid, localActivity);
-        if (result.success) {
-          showAutoSaveStatus('Activity synced');
-        }
-      }
-
-      setPendingChanges(false);
-      setSyncStatus('connected');
-    } catch (error) {
-      console.error('Sync error:', error);
-      setSyncStatus('error');
-      showAutoSaveStatus('Sync failed: ' + error.message, true);
-    }
-  };
-
-  // Enhanced data saving with Firebase integration
-  const saveInventoryToCloud = async (inventoryData) => {
-    if (!currentUser) return;
-
-    try {
-      const result = await firestoreService.saveInventory(currentUser.uid, inventoryData);
-      if (result.success) {
-        setLastSyncTime(new Date());
-        // Only show message if there was a previous error or if this is a recovery sync
-        if (syncStatus === 'error' || pendingChanges) {
-          showAutoSaveStatus('Inventory synced with cloud');
-        }
-      } else {
-        setPendingChanges(true);
-        showAutoSaveStatus('Saved locally (will sync when online)', false);
-      }
-    } catch (error) {
-      setPendingChanges(true);
-      console.error('Cloud save error:', error);
-      showAutoSaveStatus('Failed to save to cloud', true);
-    }
-  };
-
-  const saveDistributionToCloud = async (distributionData) => {
-    if (!currentUser) return;
-
-    try {
-      const result = await firestoreService.addDistribution(currentUser.uid, distributionData);
-      if (result.success) {
-        setLastSyncTime(new Date());
-        showAutoSaveStatus('Distribution saved to cloud');
-        return result.id;
-      } else {
-        setPendingChanges(true);
-        showAutoSaveStatus('Saved locally (will sync when online)', false);
-      }
-    } catch (error) {
-      setPendingChanges(true);
-      console.error('Distribution save error:', error);
-    }
-  };
-
-  const savePreferencesToCloud = async (preferences) => {
-    if (!currentUser) return;
-
-    try {
-      const result = await firestoreService.saveUserPreferences(currentUser.uid, preferences);
-      if (result.success) {
-        showAutoSaveStatus('Preferences synced');
-      }
-    } catch (error) {
-      console.error('Preferences save error:', error);
-    }
-  };
-
   // Enhanced data loading with validation
   useEffect(() => {
     try {
@@ -452,9 +265,7 @@ const Dashboard = () => {
     if (Object.values(currentInventory).some(val => val > 0)) {
       showAutoSaveStatus('Inventory saved');
       // Save to cloud if user is authenticated and connected
-      if (currentUser && connectionStatus.connected) {
-        saveInventoryToCloud(currentInventory);
-      } else if (currentUser) {
+      if (currentUser && !connectionStatus.connected) {
         setPendingChanges(true);
       }
     }
@@ -465,9 +276,7 @@ const Dashboard = () => {
       if (recentActivity.length > 0) {
       showAutoSaveStatus('Activity saved');
       // Save to cloud if user is authenticated
-      if (currentUser && connectionStatus.connected) {
-        firestoreService.saveActivity(currentUser.uid, recentActivity);
-      } else if (currentUser) {
+      if (currentUser && !connectionStatus.connected) {
         setPendingChanges(true);
       }
     }
@@ -482,10 +291,7 @@ const Dashboard = () => {
   // Save ordering unit preference
   useEffect(() => {
     safeLocalStorageSet('orderingUnit', orderingUnit);
-    // Save preferences to cloud
-    if (currentUser && connectionStatus.connected) {
-      savePreferencesToCloud({ orderingUnit });
-    }
+    // Only explicit saves allowed
   }, [orderingUnit]);
 
   const updateOutgoingMetrics = () => {
@@ -607,7 +413,7 @@ const Dashboard = () => {
       };
 
       // If user is authenticated, try to get cloud data
-      if (currentUser && connectionStatus.connected) {
+      if (currentUser && !connectionStatus.connected) {
         try {
           const cloudData = await firestoreService.exportUserData(currentUser.uid);
           if (cloudData.success) {
@@ -670,7 +476,7 @@ const Dashboard = () => {
           }
 
           // Import to cloud if user is authenticated
-          if (currentUser && connectionStatus.connected) {
+          if (currentUser && !connectionStatus.connected) {
             try {
               const cloudImport = await firestoreService.importUserData(currentUser.uid, importedData);
               if (cloudImport.success) {
@@ -735,7 +541,7 @@ const Dashboard = () => {
         errors: []
       },
       firebase: {
-        connected: connectionStatus.connected,
+        connected: !connectionStatus.connected,
         syncStatus: syncStatus,
         lastSync: lastSyncTime,
         pendingChanges: pendingChanges
@@ -792,17 +598,22 @@ System Health Check:
       const updated = { ...prev };
       
       if (surveyData.type === 'DISTRIBUTION') {
-        // Subtract from inventory for distributions
         Object.entries(surveyData.categoryTotals).forEach(([category, weight]) => {
           updated[category] = Math.max(0, (updated[category] || 0) - weight);
         });
+        // Explicitly save to Firestore after processing a distribution
+        if (currentUser) {
+          firestoreService.saveInventory(currentUser.uid, updated);
+        }
       } else if (surveyData.type === 'SINGLE' || surveyData.type === 'BULK') {
-        // Add to inventory for intake
         Object.entries(surveyData.categoryTotals).forEach(([category, weight]) => {
           updated[category] = (updated[category] || 0) + weight;
         });
+        // Explicitly save to Firestore after adding inventory
+        if (currentUser) {
+          firestoreService.saveInventory(currentUser.uid, updated);
+        }
       }
-      
       return updated;
     });
 
@@ -837,9 +648,9 @@ System Health Check:
       setDistributionHistory(prev => [distributionRecord, ...prev]);
 
       // Save to cloud if connected
-      if (currentUser && connectionStatus.connected) {
+      if (currentUser && !connectionStatus.connected) {
         try {
-          const cloudId = await saveDistributionToCloud(distributionRecord);
+          const cloudId = await firestoreService.saveDistribution(currentUser.uid, distributionRecord);
           if (cloudId) {
             // Update local record with cloud ID
             setDistributionHistory(prev => 
@@ -1070,6 +881,33 @@ System Health Check:
       return priorityOrder[b.priority] - priorityOrder[a.priority];
     });
   }, [currentInventory, memoizedTotalInventory, outgoingMetrics]);
+
+  // Firebase connection state monitoring
+  useEffect(() => {
+    const unsubscribe = firestoreService.onConnectionStateChange((status) => {
+      setConnectionStatus(status);
+      setSyncStatus(status.connected ? 'connected' : 'disconnected');
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  // Load inventory from Firestore on initial load if online and authenticated
+  useEffect(() => {
+    if (currentUser && connectionStatus.connected) {
+      firestoreService.getInventory(currentUser.uid)
+        .then(data => {
+          if (data && data.categories) {
+            setCurrentInventory(data.categories);
+          }
+        })
+        .catch(error => {
+          console.error('Error loading inventory from Firestore:', error);
+          showAutoSaveStatus('Error loading cloud inventory', true);
+        });
+    }
+  }, [currentUser, connectionStatus.connected]);
 
   return (
     <div className="dashboard">
