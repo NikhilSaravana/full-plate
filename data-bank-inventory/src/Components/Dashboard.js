@@ -142,12 +142,14 @@ const Dashboard = () => {
     }
   };
 
+  // Helper to get namespaced key
+  const nsKey = (base) => currentUser ? `${base}_${currentUser.uid}` : base;
+
   // Enhanced localStorage operations with error handling
   const safeLocalStorageGet = (key, defaultValue = null) => {
     try {
-      const item = localStorage.getItem(key);
+      const item = localStorage.getItem(nsKey(key));
       if (!item) return defaultValue;
-      
       const parsed = JSON.parse(item);
       return parsed;
     } catch (error) {
@@ -159,7 +161,7 @@ const Dashboard = () => {
 
   const safeLocalStorageSet = (key, value) => {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(nsKey(key), JSON.stringify(value));
       setStorageStatus('healthy');
       return true;
     } catch (error) {
@@ -171,7 +173,7 @@ const Dashboard = () => {
         cleanupOldData();
         // Try again after cleanup
         try {
-          localStorage.setItem(key, JSON.stringify(value));
+          localStorage.setItem(nsKey(key), JSON.stringify(value));
           setStorageStatus('healthy');
           return true;
         } catch (retryError) {
@@ -244,41 +246,44 @@ const Dashboard = () => {
 
   // Enhanced data loading with validation
   useEffect(() => {
+    if (!currentUser) return;
+    // Clear all non-namespaced keys on login
+    Object.keys(localStorage).forEach(key => {
+      if (!key.endsWith(`_${currentUser.uid}`)) {
+        localStorage.removeItem(key);
+      }
+    });
     try {
       const savedInventory = safeLocalStorageGet('foodBankInventory');
       const savedActivity = safeLocalStorageGet('foodBankActivity', []);
       const savedDistributions = safeLocalStorageGet('distributionHistory', []);
       const hasBeenSetup = safeLocalStorageGet('foodBankSetupComplete');
-
       // Validate and load inventory
       if (savedInventory && validateData(savedInventory, 'inventory')) {
         setCurrentInventory(savedInventory);
       }
-
       // Validate and load activity
       if (validateData(savedActivity, 'activity')) {
         setRecentActivity(savedActivity);
       }
-
       // Validate and load distributions
       if (validateData(savedDistributions, 'distributions')) {
         setDistributionHistory(savedDistributions);
       }
-
       if (hasBeenSetup) {
         setIsFirstTime(false);
       }
-
       setStorageStatus('healthy');
     } catch (error) {
       console.error('Error loading data from localStorage:', error);
       setStorageStatus('error');
       showAutoSaveStatus('Error loading saved data', true);
     }
-  }, []);
+  }, [currentUser]);
 
   // Enhanced data saving with safe storage functions
   useEffect(() => {
+    if (!currentUser) return;
     safeLocalStorageSet('foodBankInventory', currentInventory);
     if (Object.values(currentInventory).some(val => val > 0)) {
       showAutoSaveStatus('Inventory saved');
@@ -287,30 +292,31 @@ const Dashboard = () => {
         setPendingChanges(true);
       }
     }
-  }, [currentInventory]);
+  }, [currentInventory, currentUser]);
 
   useEffect(() => {
+    if (!currentUser) return;
     safeLocalStorageSet('foodBankActivity', recentActivity);
-      if (recentActivity.length > 0) {
+    if (recentActivity.length > 0) {
       showAutoSaveStatus('Activity saved');
       // Save to cloud if user is authenticated
       if (currentUser && !connectionStatus.connected) {
         setPendingChanges(true);
       }
     }
-  }, [recentActivity]);
+  }, [recentActivity, currentUser]);
 
-  // Save distribution data and update metrics
   useEffect(() => {
+    if (!currentUser) return;
     safeLocalStorageSet('distributionHistory', distributionHistory);
     updateOutgoingMetrics();
-  }, [distributionHistory]);
+  }, [distributionHistory, currentUser]);
 
-  // Save ordering unit preference
   useEffect(() => {
+    if (!currentUser) return;
     safeLocalStorageSet('orderingUnit', orderingUnit);
     // Only explicit saves allowed
-  }, [orderingUnit]);
+  }, [orderingUnit, currentUser]);
 
   const updateOutgoingMetrics = () => {
     const today = new Date().toISOString().split('T')[0];
@@ -918,6 +924,17 @@ System Health Check:
         .then(data => {
           if (data && data.categories) {
             setCurrentInventory(data.categories);
+          } else {
+            // No inventory in Firestore, start fresh
+            setCurrentInventory({
+              'DAIRY': 0,
+              'GRAIN': 0,
+              'PROTEIN': 0,
+              'FRUIT': 0,
+              'VEG': 0,
+              'PRODUCE': 0,
+              'MISC': 0
+            });
           }
         })
         .catch(error => {

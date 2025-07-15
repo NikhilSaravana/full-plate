@@ -52,6 +52,7 @@ export function AuthProvider({ children }) {
 
   // Logout function
   function logout() {
+    localStorage.clear(); // Clear all localStorage data on logout
     return signOut(auth);
   }
 
