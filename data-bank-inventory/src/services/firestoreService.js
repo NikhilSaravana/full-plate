@@ -174,14 +174,12 @@ class FirestoreService {
     try {
       const distributionsRef = collection(db, 'users', userId, 'distributions');
       const docRef = doc(distributionsRef);
-      
       await setDoc(docRef, {
         ...distributionData,
         date: distributionData.date || serverTimestamp(),
         createdAt: serverTimestamp(),
         id: docRef.id
       });
-
       return { 
         success: true, 
         message: 'Distribution recorded successfully',
@@ -195,12 +193,12 @@ class FirestoreService {
     }
   }
 
+  // FIXED: Load distributions from the correct user subcollection
   async getUserDistributions(userId, limitCount = 50) {
     try {
       const q = query(
-        collection(db, COLLECTIONS.DISTRIBUTIONS),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
+        collection(db, 'users', userId, 'distributions'),
+        orderBy('date', 'desc'),
         limit(limitCount)
       );
       const querySnapshot = await getDocs(q);

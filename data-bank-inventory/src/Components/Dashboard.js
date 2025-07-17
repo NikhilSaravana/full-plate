@@ -68,6 +68,52 @@ const Dashboard = () => {
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [autoSaveStatus, setAutoSaveStatus] = useState('');
 
+  // Helper to get namespaced key
+  const nsKey = (base) => currentUser ? `${base}_${currentUser.uid}` : base;
+
+  // Enhanced localStorage operations with error handling
+  const safeLocalStorageGet = (key, defaultValue = null) => {
+    try {
+      const item = localStorage.getItem(nsKey(key));
+      if (!item) return defaultValue;
+      const parsed = JSON.parse(item);
+      return parsed;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      setStorageStatus('error');
+      return defaultValue;
+    }
+  };
+
+  const safeLocalStorageSet = (key, value) => {
+    try {
+      localStorage.setItem(nsKey(key), JSON.stringify(value));
+      setStorageStatus('healthy');
+      return true;
+    } catch (error) {
+      console.error(`Error saving ${key} to localStorage:`, error);
+      setStorageStatus('error');
+      // Try to free up space by removing old data
+      if (error.name === 'QuotaExceededError') {
+        cleanupOldData();
+        // Try again after cleanup
+        try {
+          localStorage.setItem(nsKey(key), JSON.stringify(value));
+          setStorageStatus('healthy');
+          return true;
+        } catch (retryError) {
+          console.error('Failed to save even after cleanup:', retryError);
+          return false;
+        }
+      }
+      return false;
+    }
+  };
+
+  // Helper to get today's date string
+  const getTodayString = () => new Date().toISOString().split('T')[0];
+
+  // Remove distributedToday localStorage logic
   // Enhanced Distribution Tracking
   const [distributionHistory, setDistributionHistory] = useState([]);
   const [outgoingMetrics, setOutgoingMetrics] = useState({
@@ -102,16 +148,15 @@ const Dashboard = () => {
   const [pendingChanges, setPendingChanges] = useState(false);
 
   // Pie chart colors
-  const PIE_COLORS = [
-    '#2c5aa0', // Blue
-    '#28a745', // Green
-    '#ffc107', // Yellow
-    '#dc3545', // Red
-    '#17a2b8', // Teal
-    '#6f42c1', // Purple
-    '#fd7e14', // Orange
-    '#343a40', // Dark
-  ];
+  const CATEGORY_COLORS = {
+    'DAIRY': '#2c5aa0', // Blue
+    'GRAIN': '#28a745', // Green
+    'PROTEIN': '#ffc107', // Yellow
+    'FRUIT': '#dc3545', // Red
+    'VEG': '#17a2b8', // Teal
+    'PRODUCE': '#6f42c1', // Purple
+    'MISC': '#fd7e14', // Orange
+  };
 
   // Prepare data for pie chart
   const pieData = Object.entries(currentInventory)
@@ -138,49 +183,6 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error(`Data validation failed for ${type}:`, error);
-      return false;
-    }
-  };
-
-  // Helper to get namespaced key
-  const nsKey = (base) => currentUser ? `${base}_${currentUser.uid}` : base;
-
-  // Enhanced localStorage operations with error handling
-  const safeLocalStorageGet = (key, defaultValue = null) => {
-    try {
-      const item = localStorage.getItem(nsKey(key));
-      if (!item) return defaultValue;
-      const parsed = JSON.parse(item);
-      return parsed;
-    } catch (error) {
-      console.error(`Error reading ${key} from localStorage:`, error);
-      setStorageStatus('error');
-      return defaultValue;
-    }
-  };
-
-  const safeLocalStorageSet = (key, value) => {
-    try {
-      localStorage.setItem(nsKey(key), JSON.stringify(value));
-      setStorageStatus('healthy');
-      return true;
-    } catch (error) {
-      console.error(`Error saving ${key} to localStorage:`, error);
-      setStorageStatus('error');
-      
-      // Try to free up space by removing old data
-      if (error.name === 'QuotaExceededError') {
-        cleanupOldData();
-        // Try again after cleanup
-        try {
-          localStorage.setItem(nsKey(key), JSON.stringify(value));
-          setStorageStatus('healthy');
-          return true;
-        } catch (retryError) {
-          console.error('Failed to save even after cleanup:', retryError);
-          return false;
-        }
-      }
       return false;
     }
   };
@@ -309,7 +311,7 @@ const Dashboard = () => {
   useEffect(() => {
     if (!currentUser) return;
     safeLocalStorageSet('distributionHistory', distributionHistory);
-    updateOutgoingMetrics();
+    // updateOutgoingMetrics(); // This is now handled by the new useEffect
   }, [distributionHistory, currentUser]);
 
   useEffect(() => {
@@ -318,33 +320,62 @@ const Dashboard = () => {
     // Only explicit saves allowed
   }, [orderingUnit, currentUser]);
 
-  const updateOutgoingMetrics = () => {
+  // --- Midnight Reset Timer ---
+  useEffect(() => {
+    if (!currentUser) return;
+    // Calculate ms until next midnight
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const msToMidnight = nextMidnight - now;
+    const timer = setTimeout(() => {
+      // setDistributedToday({ value: 0, date: getTodayString() }); // Removed
+      // saveDistributedToday(0, getTodayString()); // Removed
+      // updateOutgoingMetrics(); // Removed
+    }, msToMidnight);
+    return () => clearTimeout(timer);
+  }, [currentUser]);
+
+  // --- Load distributionHistory from Firestore on login ---
+  useEffect(() => {
+    if (currentUser && connectionStatus.connected) {
+      firestoreService.getUserDistributions(currentUser.uid, 1000)
+        .then(data => {
+          if (Array.isArray(data)) {
+            setDistributionHistory(data);
+          } else if (Array.isArray(data?.data)) {
+            setDistributionHistory(data.data);
+          } else {
+            setDistributionHistory([]);
+          }
+        })
+        .catch(error => {
+          console.error('Error loading distribution history from Firestore:', error);
+          setDistributionHistory([]);
+        });
+    }
+  }, [currentUser, connectionStatus.connected]);
+
+  // --- Calculate outgoingMetrics from distributionHistory ---
+  useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
-    
-    const todaysDistributions = distributionHistory.filter(dist => 
-      dist.date === today
-    );
-    
-    const weekDistributions = distributionHistory.filter(dist => 
-      new Date(dist.date) >= weekAgo
-    );
-
+    const todaysDistributions = distributionHistory.filter(dist => dist.date === today);
+    const weekDistributions = distributionHistory.filter(dist => new Date(dist.date) >= weekAgo);
     const totalToday = todaysDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
     const totalWeek = weekDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
     const clientsToday = todaysDistributions.reduce((sum, dist) => sum + (dist.clientsServed || 0), 0);
-    const avgSize = distributionHistory.length > 0 
-      ? distributionHistory.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0) / distributionHistory.length 
+    const avgSize = distributionHistory.length > 0
+      ? distributionHistory.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0) / distributionHistory.length
       : 0;
-
     setOutgoingMetrics({
       totalDistributedToday: totalToday,
       totalDistributedWeek: totalWeek,
       clientsServedToday: clientsToday,
       avgDistributionSize: avgSize
     });
-  };
+  }, [distributionHistory]);
 
   // Unit conversion functions
   const getUnitWeight = (category, unit) => {
@@ -1224,8 +1255,8 @@ System Health Check:
                           outerRadius={110}
                           label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
                         >
-                          {pieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          {pieData.map((entry) => (
+                            <Cell key={`cell-${entry.name}`} fill={CATEGORY_COLORS[entry.name] || '#343a40'} />
                           ))}
                         </Pie>
                         <Tooltip formatter={(value) => `${value.toLocaleString()} lbs`} />
