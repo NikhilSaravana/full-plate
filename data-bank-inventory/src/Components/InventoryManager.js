@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getMyPlateCategory } from './FoodCategoryMapper';
 import { UnitConverters } from './UnitConfiguration';
+import { getCombinedAlerts } from './alertUtils';
 
 const InventoryManager = ({ currentInventory, onNavigate }) => {
   const [detailedInventory, setDetailedInventory] = useState({});
@@ -15,7 +16,6 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
     notes: ''
   });
   const [showAddForm, setShowAddForm] = useState(false);
-  const [alerts, setAlerts] = useState([]);
 
   const availableUnits = UnitConverters.getAvailableUnits();
 
@@ -34,54 +34,20 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
     }
   }, [detailedInventory]);
 
-  // Generate alerts based on current detailed inventory
-  useEffect(() => {
-    generateAlerts(detailedInventory);
-  }, [detailedInventory]);
-
-  const generateAlerts = (inventoryData) => {
-    const newAlerts = [];
-    const today = new Date();
-    const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    Object.entries(inventoryData).forEach(([category, data]) => {
-      if (data && data.items) {
-        data.items.forEach(item => {
-          const expDate = new Date(item.expiration);
-          
-          // Expiration alerts
-          if (expDate <= today) {
-            newAlerts.push({
-              type: 'EXPIRED',
-              severity: 'critical',
-              message: `${item.name} has expired (${item.expiration})`,
-              item: item
-            });
-          } else if (expDate <= weekFromNow) {
-            newAlerts.push({
-              type: 'EXPIRING_SOON',
-              severity: 'warning',
-              message: `${item.name} expires soon (${item.expiration})`,
-              item: item
-            });
-          }
-
-          // Low stock alerts based on converted weights
-          const pallets = UnitConverters.convertFromStandardWeight(item.weight, 'PALLET', category);
-          if (pallets < 5) { // Configurable threshold
-            newAlerts.push({
-              type: 'LOW_STOCK',
-              severity: 'info',
-              message: `${item.name} is running low (${pallets.toFixed(1)} pallets equivalent)`,
-              item: item
-            });
-          }
-        });
-      }
-    });
-
-    setAlerts(newAlerts);
+  const getTotalDetailedInventory = () => {
+    return Object.values(detailedInventory).reduce((sum, category) => {
+      return sum + (category?.total || 0);
+    }, 0);
   };
+
+  // Remove alerts state and generate combined alerts
+  const combinedAlerts = getCombinedAlerts({
+    currentInventory,
+    memoizedTotalInventory: getTotalDetailedInventory(),
+    outgoingMetrics: {}, // If you have outgoingMetrics, pass it here
+    detailedInventory,
+    UnitConverters
+  });
 
   const handleAddItem = () => {
     if (!newItem.foodType || !newItem.quantity) {
@@ -168,14 +134,10 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
     return filtered;
   };
 
-  const getTotalDetailedInventory = () => {
-    return Object.values(detailedInventory).reduce((sum, category) => {
-      return sum + (category?.total || 0);
-    }, 0);
-  };
-
-  const getCriticalAlerts = () => alerts.filter(alert => alert.severity === 'critical');
-  const getWarningAlerts = () => alerts.filter(alert => alert.severity === 'warning');
+  // Update getCriticalAlerts and getWarningAlerts to use 'type' for all alerts
+  const getCriticalAlerts = () => combinedAlerts.filter(alert => alert.type === 'CRITICAL');
+  const getWarningAlerts = () => combinedAlerts.filter(alert => alert.type === 'WARNING');
+  const getInfoAlerts = () => combinedAlerts.filter(alert => alert.type === 'INFO');
 
   const getDisplayUnits = (item, category) => {
     const unitConfig = availableUnits.find(u => u.key === item.originalUnit);
@@ -246,15 +208,15 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
           </div>
 
           {/* Alerts Section */}
-          {alerts.length > 0 && (
+          {combinedAlerts.length > 0 && (
             <div className="alerts-section">
               <h3>Inventory Alerts</h3>
               <div className="alerts-list">
-                {alerts.map((alert, index) => (
-                  <div key={index} className={`alert alert-${alert.severity}`}>
-                    <span className="alert-icon">WARNING</span>
+                {combinedAlerts.map((alert, index) => (
+                  <div key={index} className={`alert alert-${alert.type ? alert.type.toLowerCase() : alert.severity}`}> 
+                    <span className="alert-icon">{alert.type || alert.severity}</span>
                     <span className="alert-message">{alert.message}</span>
-                    <span className="alert-weight">{alert.item.weight} lbs</span>
+                    {alert.item && <span className="alert-weight">{alert.item.weight} lbs</span>}
                   </div>
                 ))}
               </div>

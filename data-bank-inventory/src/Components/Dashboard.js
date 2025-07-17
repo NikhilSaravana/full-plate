@@ -9,6 +9,7 @@ import ConfirmationDialog from './ConfirmationDialog';
 import firestoreService from '../services/firestoreService';
 import { UnitConverters } from './UnitConfiguration';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { getCombinedAlerts } from './alertUtils';
 
 // Default unit configurations for inventory units
 const DEFAULT_UNIT_CONFIGS = {
@@ -975,6 +976,26 @@ System Health Check:
     }
   }, [currentUser, connectionStatus.connected]);
 
+  // Add state for detailedInventory
+  const [detailedInventory, setDetailedInventory] = useState({});
+
+  // Load detailedInventory from localStorage on mount
+  useEffect(() => {
+    const savedDetailedInventory = localStorage.getItem('detailedInventory');
+    if (savedDetailedInventory) {
+      setDetailedInventory(JSON.parse(savedDetailedInventory));
+    }
+  }, []);
+
+  // Use getCombinedAlerts for dashboard alerts
+  const combinedAlerts = getCombinedAlerts({
+    currentInventory,
+    memoizedTotalInventory,
+    outgoingMetrics,
+    detailedInventory,
+    UnitConverters
+  });
+
   return (
     <div className="dashboard">
       {/* Auto-save status indicator - subtle and temporary */}
@@ -1047,6 +1068,14 @@ System Health Check:
           <div className="stat-card">
             <h3>Clients Served Today</h3>
             <p className="stat-value">{outgoingMetrics.clientsServedToday}</p>
+          </div>
+          <div className="stat-card critical">
+            <h3>Critical Alerts</h3>
+            <p className="stat-value">{combinedAlerts.filter(alert => alert.type === 'CRITICAL').length}</p>
+          </div>
+          <div className="stat-card warning">
+            <h3>Warnings</h3>
+            <p className="stat-value">{combinedAlerts.filter(alert => alert.type === 'WARNING').length}</p>
           </div>
         </div>
       </header>
@@ -1296,30 +1325,26 @@ System Health Check:
                 <div className="overview-section">
                       <h2>Critical Alerts & Warnings</h2>
                       <div className="alerts-feed">
-                        {getCriticalAlerts.length === 0 ? (
+                        {combinedAlerts.length === 0 ? (
                           <div className="no-alerts">
                             <p>No critical alerts at this time</p>
                             <p>All systems are operating within normal parameters.</p>
                           </div>
                         ) : (
-                          getCriticalAlerts.slice(0, 8).map((alert, index) => (
-                            <div key={index} className={`alert-item ${alert.type.toLowerCase()}`}>
+                          combinedAlerts.slice(0, 8).map((alert, index) => (
+                            <div key={index} className={`alert-item ${alert.type ? alert.type.toLowerCase() : alert.severity}`}> 
                               <div className="alert-icon">
-                                {alert.type === 'CRITICAL' && 'CRITICAL'}
-                                {alert.type === 'WARNING' && 'WARNING'}
-                                {alert.type === 'INFO' && 'INFO'}
-                          </div>
+                                {alert.type || alert.severity}
+                              </div>
                               <div className="alert-content">
                                 <p className="alert-message">{alert.message}</p>
-                                <p className="alert-action">{alert.action}</p>
+                                {alert.action && <p className="alert-action">{alert.action}</p>}
                               </div>
-                              <div className={`alert-priority ${alert.priority}`}>
-                                {alert.priority.toUpperCase()}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                              <div className={`alert-priority ${alert.priority || alert.severity}`}>{(alert.priority || alert.severity)?.toUpperCase()}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
                 </div>
 
                 <div className="overview-section">
