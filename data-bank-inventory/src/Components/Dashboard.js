@@ -1037,7 +1037,7 @@ System Health Check:
 
   return (
     <>
-      <button onClick={reloadDistributionHistoryFromFirestore} style={{position: 'fixed', top: 10, right: 10, zIndex: 1000}}>Reload Distributions from Firestore</button>
+      {/* Removed: Reload Distributions from Firestore button */}
       <div className="dashboard">
         {/* Auto-save status indicator - subtle and temporary */}
         {autoSaveStatus && (
@@ -1600,6 +1600,7 @@ System Health Check:
         {activeTab === 'dataentry' && (
           <div className="data-entry-tab">
             <SurveyInterface onDataSubmit={handleSurveySubmit} />
+            {/* Removed: Distribution log from Food Intake tab */}
           </div>
         )}
 

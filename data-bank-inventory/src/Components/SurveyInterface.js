@@ -197,12 +197,6 @@ const SurveyInterface = ({ onDataSubmit }) => {
           >
             Bulk Import
           </button>
-          <button
-            className={`nav-tab ${surveyMode === 'DISTRIBUTION' ? 'active' : ''}`}
-            onClick={() => setSurveyMode('DISTRIBUTION')}
-          >
-            Distribution Log
-          </button>
         </div>
       </div>
 
@@ -401,89 +395,6 @@ const SurveyInterface = ({ onDataSubmit }) => {
             <button onClick={handleBulkDataParse} className="btn btn-primary" style={{ marginTop: '16px' }}>
               Parse Data
             </button>
-          </div>
-        )}
-
-        {/* Distribution Mode */}
-        {surveyMode === 'DISTRIBUTION' && (
-          <div className="form-section">
-            <h3>Distribution Log</h3>
-            <div className="form-grid">
-              <div className="form-field">
-                <label className="form-label-enhanced">Total Distributed:</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  className="form-control-enhanced"
-                  value={distributionData.totalDistributed}
-                  onChange={(e) => setDistributionData({
-                    ...distributionData,
-                    totalDistributed: e.target.value
-                  })}
-                />
-              </div>
-              <div className="form-field">
-                <label className="form-label-enhanced">Unit:</label>
-                <select
-                  className="form-control-enhanced"
-                  value={distributionData.unit}
-                  onChange={(e) => setDistributionData({
-                    ...distributionData,
-                    unit: e.target.value
-                  })}
-                >
-                  {availableUnits.map(unit => (
-                    <option key={unit.key} value={unit.key}>
-                      {unit.name} ({unit.abbreviation})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-field">
-                <label className="form-label-enhanced">Clients Served:</label>
-                <input
-                  type="number"
-                  className="form-control-enhanced"
-                  value={distributionData.clientsServed}
-                  onChange={(e) => setDistributionData({
-                    ...distributionData,
-                    clientsServed: e.target.value
-                  })}
-                />
-              </div>
-              <div className="form-field">
-                <label className="form-label-enhanced">Avg Family Size:</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  className="form-control-enhanced"
-                  value={distributionData.avgFamilySize}
-                  onChange={(e) => setDistributionData({
-                    ...distributionData,
-                    avgFamilySize: e.target.value
-                  })}
-                />
-              </div>
-            </div>
-            <div className="calculated-stats">
-              <p>Estimated People Served: {
-                (distributionData.clientsServed * distributionData.avgFamilySize).toFixed(0)
-              }</p>
-              <p>Avg per Client: {
-                distributionData.totalDistributed && distributionData.clientsServed ? 
-                (distributionData.totalDistributed / distributionData.clientsServed).toFixed(1) + 
-                ` ${availableUnits.find(u => u.key === distributionData.unit)?.abbreviation}` : 
-                'N/A'
-              }</p>
-              {distributionData.unit !== 'POUND' && distributionData.totalDistributed && (
-                <p>Total in Pounds: {
-                  UnitConverters.convertToStandardWeight(
-                    parseFloat(distributionData.totalDistributed), 
-                    distributionData.unit
-                  ).toFixed(1)
-                } lbs</p>
-              )}
-            </div>
           </div>
         )}
 
