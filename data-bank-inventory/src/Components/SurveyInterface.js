@@ -18,7 +18,6 @@ const SurveyInterface = ({ onDataSubmit }) => {
     totalDistributed: '',
     unit: 'POUND',
     clientsServed: '',
-    avgFamilySize: '3',
     categories: {}
   });
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -137,7 +136,6 @@ const SurveyInterface = ({ onDataSubmit }) => {
       totalDistributed: '',
       unit: 'POUND',
       clientsServed: '',
-      avgFamilySize: '3',
       categories: {}
     });
 

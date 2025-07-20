@@ -33,6 +33,7 @@ export const FOOD_CATEGORY_MAPPING = {
   '07-Dairy Products': 'DAIRY',
   'MILK': 'DAIRY',
   'DAIRY': 'DAIRY',
+  'CHEESE': 'DAIRY',
   
   // Desserts
   '08-Desserts': 'MISC',
@@ -72,6 +73,7 @@ export const FOOD_CATEGORY_MAPPING = {
   'PB': 'PROTEIN',
   '23-Non-Meat Protein': 'PROTEIN',
   'EGG': 'PROTEIN',
+  'EGGS': 'PROTEIN',
   'PINTO_BEAN': 'PROTEIN',
   'PRO-NON': 'PROTEIN',
   'BLACK_BEAN': 'PROTEIN',

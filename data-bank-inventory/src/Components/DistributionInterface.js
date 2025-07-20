@@ -14,7 +14,6 @@ const DistributionInterface = ({ onDataSubmit }) => {
   ]);
   const [clientInfo, setClientInfo] = useState({
     clientsServed: '',
-    avgFamilySize: '3'
   });
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationConfig, setConfirmationConfig] = useState({});
@@ -94,7 +93,6 @@ const DistributionInterface = ({ onDataSubmit }) => {
       recipient: formData.recipient,
       notes: formData.notes,
       clientsServed: parseInt(clientInfo.clientsServed) || 0,
-      avgFamilySize: parseFloat(clientInfo.avgFamilySize) || 3,
       items: items.map(item => ({
         ...item,
         weightInPounds: getWeightInPounds(item.quantity, item.unit, getMyPlateCategory(item.foodType))
@@ -117,7 +115,6 @@ const DistributionInterface = ({ onDataSubmit }) => {
     });
     setClientInfo({
       clientsServed: '',
-      avgFamilySize: '3'
     });
 
     setConfirmationConfig({
@@ -176,16 +173,6 @@ const DistributionInterface = ({ onDataSubmit }) => {
                 value={clientInfo.clientsServed}
                 onChange={(e) => setClientInfo({...clientInfo, clientsServed: e.target.value})}
                 placeholder="Number of clients"
-              />
-            </div>
-            <div className="form-field">
-              <label className="form-label-enhanced">Average Family Size:</label>
-              <input
-                type="number"
-                step="0.1"
-                className="form-control-enhanced"
-                value={clientInfo.avgFamilySize}
-                onChange={(e) => setClientInfo({...clientInfo, avgFamilySize: e.target.value})}
               />
             </div>
           </div>
@@ -319,7 +306,6 @@ const DistributionInterface = ({ onDataSubmit }) => {
               <p><strong>Total Items:</strong> {items.filter(item => item.foodType && item.quantity).length}</p>
               {clientInfo.clientsServed && (
                 <>
-                  <p><strong>Estimated People Served:</strong> {(parseFloat(clientInfo.clientsServed) * parseFloat(clientInfo.avgFamilySize)).toFixed(0)}</p>
                   <p><strong>Average per Client:</strong> {(calculateTotalWeight() / parseFloat(clientInfo.clientsServed)).toFixed(1)} lbs</p>
                 </>
               )}
