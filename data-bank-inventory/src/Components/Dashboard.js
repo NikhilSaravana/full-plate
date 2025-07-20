@@ -333,21 +333,63 @@ const Dashboard = () => {
     // Only explicit saves allowed
   }, [orderingUnit, currentUser]);
 
+  // --- Calculate outgoingMetrics from distributionHistory ---
+  useEffect(() => {
+    if (!currentUser) return;
+    const now = new Date();
+    const todayString = now.toISOString().split('T')[0];
+    // Start of today (local)
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Start of week (local, Sunday)
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+
+    const todaysDistributions = distributionHistory.filter(dist => {
+      // Use timestamp, createdAt, or date
+      let distDate = null;
+      if (dist.createdAt && dist.createdAt.toDate) distDate = dist.createdAt.toDate();
+      else if (dist.createdAt && typeof dist.createdAt === 'string') distDate = new Date(dist.createdAt);
+      else if (dist.timestamp) distDate = new Date(dist.timestamp);
+      else if (dist.date) distDate = new Date(dist.date);
+      if (!distDate) return false;
+      return distDate >= startOfToday && distDate < new Date(startOfToday.getTime() + 24*60*60*1000);
+    });
+    const weekDistributions = distributionHistory.filter(dist => {
+      let distDate = null;
+      if (dist.createdAt && dist.createdAt.toDate) distDate = dist.createdAt.toDate();
+      else if (dist.createdAt && typeof dist.createdAt === 'string') distDate = new Date(dist.createdAt);
+      else if (dist.timestamp) distDate = new Date(dist.timestamp);
+      else if (dist.date) distDate = new Date(dist.date);
+      if (!distDate) return false;
+      return distDate >= startOfWeek && distDate <= now;
+    });
+    const totalToday = todaysDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
+    const totalWeek = weekDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
+    const clientsToday = todaysDistributions.reduce((sum, dist) => sum + (dist.clientsServed || 0), 0);
+    const avgSize = distributionHistory.length > 0
+      ? distributionHistory.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0) / distributionHistory.length
+      : 0;
+    setOutgoingMetrics(prev => ({
+      ...prev,
+      totalDistributedToday: totalToday,
+      totalDistributedWeek: totalWeek,
+      clientsServedToday: clientsToday,
+      avgDistributionSize: avgSize
+    }));
+  }, [distributionHistory, currentUser]);
+
   // --- Midnight Reset Timer ---
   useEffect(() => {
     if (!currentUser) return;
-    // Calculate ms until next midnight
+    // Calculate ms until next midnight (local time)
     const now = new Date();
-    const nextMidnight = new Date(now);
-    nextMidnight.setHours(24, 0, 0, 0);
+    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const msToMidnight = nextMidnight - now;
     const timer = setTimeout(() => {
-      // setDistributedToday({ value: 0, date: getTodayString() }); // Removed
-      // saveDistributedToday(0, getTodayString()); // Removed
-      // updateOutgoingMetrics(); // Removed
+      // Force recalculation by updating distributionHistory (trigger useEffect above)
+      setDistributionHistory(d => [...d]);
     }, msToMidnight);
     return () => clearTimeout(timer);
-  }, [currentUser]);
+  }, [currentUser, distributionHistory]);
 
   // --- Load distributionHistory from Firestore on login or reload ---
   const reloadDistributionHistoryFromFirestore = async () => {
