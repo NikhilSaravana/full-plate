@@ -27,6 +27,8 @@ const MyPlateCalculator = ({ currentInventory = {} }) => {
   };
 
   const calculateMyPlateBalance = () => {
+    console.log('MyPlate Calculator - currentInventory:', currentInventory);
+    
     // Calculate totals by MyPlate category
     const totals = {};
     let grandTotal = 0;
@@ -37,11 +39,24 @@ const MyPlateCalculator = ({ currentInventory = {} }) => {
     });
 
     // Sum up inventory by category
-    Object.entries(currentInventory).forEach(([foodType, weight]) => {
-      const category = getMyPlateCategory(foodType);
-      totals[category] += weight;
-      grandTotal += weight;
+    Object.entries(currentInventory).forEach(([category, weight]) => {
+      console.log(`Processing category: ${category}, weight: ${weight}`);
+      // currentInventory already contains aggregated category data
+      // so we can use the category directly
+      if (MYPLATE_GOALS[category]) {
+        totals[category] += weight;
+        grandTotal += weight;
+        console.log(`Added ${weight} to ${category}, total now: ${totals[category]}`);
+      } else {
+        // If category not found in MYPLATE_GOALS, add to MISC
+        console.log(`Category ${category} not found in MYPLATE_GOALS, adding to MISC`);
+        totals['MISC'] += weight;
+        grandTotal += weight;
+      }
     });
+    
+    console.log('Final totals:', totals);
+    console.log('Grand total:', grandTotal);
 
     // Calculate percentages and status
     const categoryStats = {};
@@ -50,6 +65,8 @@ const MyPlateCalculator = ({ currentInventory = {} }) => {
       const currentPercentage = grandTotal > 0 ? (currentWeight / grandTotal) * 100 : 0;
       const goalPercentage = goals.percentage;
       const status = getCategoryStatus(currentPercentage, goalPercentage);
+      
+      console.log(`${category}: Current=${currentWeight}lbs (${currentPercentage}%), Goal=${goalPercentage}%, Status=${status}`);
       
       // Calculate target weights
       const targetWeight = (goalPercentage / 100) * SYSTEM_CONFIG.TARGET_CAPACITY;
