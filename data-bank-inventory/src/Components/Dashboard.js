@@ -349,7 +349,51 @@ const Dashboard = () => {
     return () => clearTimeout(timer);
   }, [currentUser]);
 
-  // --- Load distributionHistory from Firestore on login --- REMOVED: This is now handled by the new system above
+  // --- Load distributionHistory from Firestore on login or reload ---
+  const reloadDistributionHistoryFromFirestore = async () => {
+    if (!currentUser) return;
+    setIsLoadingDistributions(true);
+    try {
+      const history = await firestoreService.getUserDistributions(currentUser.uid, 1000);
+      if (Array.isArray(history) && history.length > 0) {
+        setDistributionHistory(history);
+        safeLocalStorageSet(getDistributionHistoryKey(), history);
+        console.log('Set distributionHistory in state:', history);
+        // Recalculate today's metrics
+        const today = new Date().toISOString().split('T')[0];
+        const todaysDistributions = history.filter(dist => dist.date === today);
+        const totalToday = todaysDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
+        const clientsToday = todaysDistributions.reduce((sum, dist) => sum + (dist.clientsServed || 0), 0);
+        setOutgoingMetrics(prev => ({
+          ...prev,
+          totalDistributedToday: totalToday,
+          clientsServedToday: clientsToday
+        }));
+      } else {
+        setDistributionHistory([]);
+        setOutgoingMetrics(prev => ({
+          ...prev,
+          totalDistributedToday: 0,
+          clientsServedToday: 0
+        }));
+        console.log('No distributions found in Firestore.');
+      }
+    } finally {
+      setIsLoadingDistributions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!currentUser) return;
+    // Load from localStorage for instant display
+    const key = getDistributionHistoryKey();
+    const savedDistributions = safeLocalStorageGet(key, []);
+    if (Array.isArray(savedDistributions) && savedDistributions.length > 0) {
+      setDistributionHistory(savedDistributions);
+    }
+    // Then update from Firestore
+    reloadDistributionHistoryFromFirestore();
+  }, [currentUser]);
 
   /*
   // --- Calculate outgoingMetrics from distributionHistory ---
@@ -647,8 +691,7 @@ System Health Check:
   const validateDistributions = (data) => {
     return Array.isArray(data) && data.every(item =>
       item && typeof item === 'object' &&
-      typeof item.date === 'string' &&
-      typeof item.totalDistributed === 'number'
+      typeof item.date === 'string'
     );
   };
 
@@ -658,6 +701,7 @@ System Health Check:
   // Load distributionHistory from localStorage on mount/login
   const [isLoadingDistributions, setIsLoadingDistributions] = useState(true);
   
+  /*
   useEffect(() => {
     if (!currentUser) return;
     const key = getDistributionHistoryKey();
@@ -672,6 +716,7 @@ System Health Check:
     }
     setIsLoadingDistributions(false);
   }, [currentUser]);
+*/
 
   // Save distributionHistory to localStorage whenever it changes
   useEffect(() => {
@@ -707,30 +752,6 @@ System Health Check:
         });
     }
   }, [currentUser, connectionStatus.connected]);
-
-  // Load distributionHistory from Firestore on login
-  useEffect(() => {
-    if (!currentUser) return;
-    firestoreService.getDistributionHistory(currentUser.uid)
-      .then(history => {
-        if (Array.isArray(history)) {
-          setDistributionHistory(history.sort((a, b) => new Date(b.date) - new Date(a.date)));
-          // Calculate today's totals
-          const today = new Date().toISOString().split('T')[0];
-          const todaysDistributions = history.filter(dist => dist.date === today);
-          const totalToday = todaysDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
-          const clientsToday = todaysDistributions.reduce((sum, dist) => sum + (dist.clientsServed || 0), 0);
-          setOutgoingMetrics(prev => ({
-            ...prev,
-            totalDistributedToday: totalToday,
-            clientsServedToday: clientsToday
-          }));
-        }
-      })
-      .catch(err => {
-        console.error('Failed to load distribution history from Firestore:', err);
-      });
-  }, [currentUser]);
 
   // When a distribution is submitted, always update state and Firestore
   const handleSurveySubmit = async (surveyData) => {
@@ -771,7 +792,7 @@ System Health Check:
     // Handle distribution tracking
     if (surveyData.type === 'DISTRIBUTION') {
       const distributionRecord = {
-        date: new Date().toISOString().split('T')[0],
+        date: surveyData.date || new Date().toISOString().split('T')[0], // Use the date from the form if present
         recipient: surveyData.recipient || 'Unknown',
         totalDistributed: surveyData.totalDistributed || 0,
         clientsServed: surveyData.clientsServed || 0,
@@ -790,17 +811,20 @@ System Health Check:
       // Save to Firestore
       if (currentUser) {
         try {
+          console.log('Attempting to save distribution to Firestore:', distributionRecord);
           await firestoreService.addDistributionRecord(currentUser.uid, distributionRecord);
+          console.log('Successfully saved distribution to Firestore');
         } catch (err) {
           console.error('Failed to save distribution to Firestore:', err);
+          showAutoSaveStatus('Failed to save distribution to Firestore', true);
         }
       }
       // Update outgoingMetrics
-      setOutgoingMetrics(prev => ({
-        ...prev,
-        totalDistributedToday: prev.totalDistributedToday + (surveyData.totalDistributed || 0),
-        clientsServedToday: prev.clientsServedToday + (surveyData.clientsServed || 0)
-      }));
+      // setOutgoingMetrics(prev => ({
+      //   ...prev,
+      //   totalDistributedToday: prev.totalDistributedToday + (surveyData.totalDistributed || 0),
+      //   clientsServedToday: prev.clientsServedToday + (surveyData.clientsServed || 0)
+      // }));
     }
 
     // Mark as no longer first time
@@ -945,412 +969,438 @@ System Health Check:
     UnitConverters
   });
 
-  return (
-    <div className="dashboard">
-      {/* Auto-save status indicator - subtle and temporary */}
-      {autoSaveStatus && (
-        <div className={`auto-save-status visible ${autoSaveStatus.isError ? 'error' : ''}`}>
-          {autoSaveStatus.message}
-        </div>
-      )}
+  console.log('Rendering distributionHistory:', distributionHistory);
 
-      <header className="dashboard-header">
-        <div className="header-content">
-          <div className="header-left">
-        <h1>Food Bank Inventory Manager</h1>
-        {isFirstTime && (
-          <div className="help-text-prominent">
-            <strong>Welcome to your Food Bank Inventory Manager!</strong>
-            <br />
-            Get started by clicking the "Food Intake" tab above to record your current food inventory. 
-            This system will help you track food donations, manage distributions, and ensure nutritional balance.
+  // In your main return, show a loading message if isLoadingDistributions is true
+  if (isLoadingDistributions) {
+    return (
+      <div style={{padding: 40, textAlign: 'center'}}>
+        <h2>Loading recent distributions...</h2>
+      </div>
+    );
+  }
+
+  // Helper to sort distributions by recency
+  const sortDistributionsByRecency = (a, b) => {
+    // Prefer createdAt (Firestore Timestamp), then timestamp (ISO string), then date (YYYY-MM-DD)
+    const getTime = (dist) => {
+      if (dist.createdAt && dist.createdAt.toDate) return dist.createdAt.toDate().getTime();
+      if (dist.createdAt && typeof dist.createdAt === 'string') return new Date(dist.createdAt).getTime();
+      if (dist.timestamp) return new Date(dist.timestamp).getTime();
+      if (dist.date) return new Date(dist.date).getTime();
+      return 0;
+    };
+    return getTime(b) - getTime(a);
+  };
+
+  return (
+    <>
+      <button onClick={reloadDistributionHistoryFromFirestore} style={{position: 'fixed', top: 10, right: 10, zIndex: 1000}}>Reload Distributions from Firestore</button>
+      <div className="dashboard">
+        {/* Auto-save status indicator - subtle and temporary */}
+        {autoSaveStatus && (
+          <div className={`auto-save-status visible ${autoSaveStatus.isError ? 'error' : ''}`}>
+            {autoSaveStatus.message}
           </div>
         )}
-          </div>
-          <div className="header-right">
-            {/* Phase 7A: Enhanced Status Indicator */}
-            <div className="sync-status">
-              <div className={`status-indicator ${
-                syncStatus === 'connected' ? 'status-good' : 
-                syncStatus === 'syncing' ? 'status-warning' : 
-                syncStatus === 'error' ? 'status-danger' : 'status-info'
-              }`}>
 
-                <span>
-                  {syncStatus === 'connected' && 'Data Saved'}
-                  {syncStatus === 'syncing' && 'Saving...'}
-                  {syncStatus === 'disconnected' && 'Working Offline'}
-                  {syncStatus === 'error' && 'Save Error'}
-                </span>
-                {pendingChanges && (
-                  <span style={{ marginLeft: '8px', fontSize: '12px' }}>
-                    (Changes Pending)
+        <header className="dashboard-header">
+          <div className="header-content">
+            <div className="header-left">
+          <h1>Food Bank Inventory Manager</h1>
+          {isFirstTime && (
+            <div className="help-text-prominent">
+              <strong>Welcome to your Food Bank Inventory Manager!</strong>
+              <br />
+              Get started by clicking the "Food Intake" tab above to record your current food inventory. 
+              This system will help you track food donations, manage distributions, and ensure nutritional balance.
+            </div>
+          )}
+            </div>
+            <div className="header-right">
+              {/* Phase 7A: Enhanced Status Indicator */}
+              <div className="sync-status">
+                <div className={`status-indicator ${
+                  syncStatus === 'connected' ? 'status-good' : 
+                  syncStatus === 'syncing' ? 'status-warning' : 
+                  syncStatus === 'error' ? 'status-danger' : 'status-info'
+                }`}>
+
+                  <span>
+                    {syncStatus === 'connected' && 'Data Saved'}
+                    {syncStatus === 'syncing' && 'Saving...'}
+                    {syncStatus === 'disconnected' && 'Working Offline'}
+                    {syncStatus === 'error' && 'Save Error'}
                   </span>
-                )}
-              </div>
-            </div>
-            <div className="user-profile">
-              <span className="user-name">
-                {currentUser?.displayName || currentUser?.email || 'User'}
-              </span>
-              <button onClick={handleLogout} className="btn btn-light" style={{ minHeight: '36px', padding: '8px 16px' }}>
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="header-stats">
-          <div className="stat-card">
-            <h3>Total Inventory</h3>
-            <p className="stat-value">
-              {getTotalInventory().toLocaleString()} lbs
-            </p>
-          </div>
-          <div className="stat-card">
-            <h3>Distributed Today</h3>
-            <p className="stat-value">{outgoingMetrics.totalDistributedToday.toLocaleString()} lbs</p>
-          </div>
-          <div className="stat-card">
-            <h3>MyPlate Compliance</h3>
-            <p className="stat-value">{getMyPlateCompliance()}</p>
-          </div>
-          <div className="stat-card">
-            <h3>Clients Served Today</h3>
-            <p className="stat-value">{outgoingMetrics.clientsServedToday}</p>
-          </div>
-          <div className="stat-card critical">
-            <h3>Critical Alerts</h3>
-            <p className="stat-value">{combinedAlerts.filter(alert => alert.type === 'CRITICAL').length}</p>
-          </div>
-          <div className="stat-card warning">
-            <h3>Warnings</h3>
-            <p className="stat-value">{combinedAlerts.filter(alert => alert.type === 'WARNING').length}</p>
-          </div>
-        </div>
-      </header>
-
-      {/* Phase 7A: Enhanced Navigation with Icons and Breadcrumbs */}
-      <nav className="dashboard-nav">
-        <div className="nav-with-icons">
-          <button 
-            className={`nav-tab ${activeTab === 'overview' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('overview');
-              setCurrentSection('overview');
-            }}
-          >
-            Overview
-          </button>
-          <button 
-            className={`nav-tab ${activeTab === 'dataentry' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('dataentry');
-              setCurrentSection('dataentry');
-            }}
-          >
-            Food Intake
-          </button>
-          <button 
-            className={`nav-tab ${activeTab === 'distribution' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('distribution');
-              setCurrentSection('distribution');
-            }}
-          >
-            Distribution
-          </button>
-          <button 
-            className={`nav-tab ${activeTab === 'myplate' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('myplate');
-              setCurrentSection('myplate');
-            }}
-          >
-            MyPlate Analysis
-          </button>
-        </div>
-        
-        {/* Phase 7A: Enhanced Utility Controls with Tooltips */}
-        <div className="nav-utils">
-          <div className="tooltip-wrapper">
-            <button onClick={performSystemHealthCheck} className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px' }}>
-              Check
-          </button>
-            <div className="tooltip">System Health Check</div>
-          </div>
-          <div className="tooltip-wrapper">
-            <button onClick={resetAllData} className="btn btn-danger" style={{ minWidth: 'auto', padding: '8px 12px' }}>
-              Reset
-            </button>
-            <div className="tooltip">Reset All Data</div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="dashboard-content">
-        {/* Phase 7A: Breadcrumb Navigation */}
-        <div className="breadcrumb">
-          <div className="breadcrumb-item">
-            <span>Food Bank Manager</span>
-          </div>
-          <span className="breadcrumb-separator">›</span>
-          <div className="breadcrumb-item breadcrumb-current">
-            {activeTab === 'overview' && (
-              <>
-                <span>Overview</span>
-                {activeOverviewSection !== 'dashboard' && (
-                  <>
-                    <span className="breadcrumb-separator">›</span>
-                    <span>
-                      {activeOverviewSection === 'inventory' && 'Inventory Management'}
-                      {activeOverviewSection === 'units' && 'Unit Configuration'}
-                      {activeOverviewSection === 'reports' && 'Analytics'}
-                      {activeOverviewSection === 'distributions' && 'Distribution History'}
+                  {pendingChanges && (
+                    <span style={{ marginLeft: '8px', fontSize: '12px' }}>
+                      (Changes Pending)
                     </span>
-                  </>
-                )}
-              </>
-            )}
-            {activeTab === 'dataentry' && (
-              <>
-                <span>Food Intake</span>
-              </>
-            )}
-            {activeTab === 'distribution' && (
-              <>
-                <span>Distribution</span>
-              </>
-            )}
-            {activeTab === 'myplate' && (
-              <>
-                <span>MyPlate Analysis</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {activeTab === 'overview' && (
-          <div className="overview-tab">
-            {getTotalInventory() === 0 ? (
-              <div className="empty-state">
-                <h2>No Inventory Data Yet</h2>
-                <p>Get started by adding your current inventory using the "Data Entry" tab.</p>
-                <button 
-                  className="btn btn-primary btn-large"
-                  onClick={() => setActiveTab('dataentry')}
-                >
-                  Start Adding Inventory
+                  )}
+                </div>
+              </div>
+              <div className="user-profile">
+                <span className="user-name">
+                  {currentUser?.displayName || currentUser?.email || 'User'}
+                </span>
+                <button onClick={handleLogout} className="btn btn-light" style={{ minHeight: '36px', padding: '8px 16px' }}>
+                  Sign Out
                 </button>
               </div>
-            ) : (
-              <div className="overview-content">
-                {/* Phase 7A: Enhanced Overview Navigation */}
-                <div className="nav-with-icons" style={{ marginBottom: '24px' }}>
+            </div>
+          </div>
+          <div className="header-stats">
+            <div className="stat-card">
+              <h3>Total Inventory</h3>
+              <p className="stat-value">
+                {getTotalInventory().toLocaleString()} lbs
+              </p>
+            </div>
+            <div className="stat-card">
+              <h3>Distributed Today</h3>
+              <p className="stat-value">{outgoingMetrics.totalDistributedToday.toLocaleString()} lbs</p>
+            </div>
+            <div className="stat-card">
+              <h3>MyPlate Compliance</h3>
+              <p className="stat-value">{getMyPlateCompliance()}</p>
+            </div>
+            <div className="stat-card">
+              <h3>Clients Served Today</h3>
+              <p className="stat-value">{outgoingMetrics.clientsServedToday}</p>
+            </div>
+            <div className="stat-card critical">
+              <h3>Critical Alerts</h3>
+              <p className="stat-value">{combinedAlerts.filter(alert => alert.type === 'CRITICAL').length}</p>
+            </div>
+            <div className="stat-card warning">
+              <h3>Warnings</h3>
+              <p className="stat-value">{combinedAlerts.filter(alert => alert.type === 'WARNING').length}</p>
+            </div>
+          </div>
+        </header>
+
+        {/* Phase 7A: Enhanced Navigation with Icons and Breadcrumbs */}
+        <nav className="dashboard-nav">
+          <div className="nav-with-icons">
+            <button 
+              className={`nav-tab ${activeTab === 'overview' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('overview');
+                setCurrentSection('overview');
+              }}
+            >
+              Overview
+            </button>
+            <button 
+              className={`nav-tab ${activeTab === 'dataentry' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('dataentry');
+                setCurrentSection('dataentry');
+              }}
+            >
+              Food Intake
+            </button>
+            <button 
+              className={`nav-tab ${activeTab === 'distribution' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('distribution');
+                setCurrentSection('distribution');
+              }}
+            >
+              Distribution
+            </button>
+            <button 
+              className={`nav-tab ${activeTab === 'myplate' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('myplate');
+                setCurrentSection('myplate');
+              }}
+            >
+              MyPlate Analysis
+            </button>
+          </div>
+          
+          {/* Phase 7A: Enhanced Utility Controls with Tooltips */}
+          <div className="nav-utils">
+            <div className="tooltip-wrapper">
+              <button onClick={performSystemHealthCheck} className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px' }}>
+                Check
+            </button>
+              <div className="tooltip">System Health Check</div>
+            </div>
+            <div className="tooltip-wrapper">
+              <button onClick={resetAllData} className="btn btn-danger" style={{ minWidth: 'auto', padding: '8px 12px' }}>
+                Reset
+              </button>
+              <div className="tooltip">Reset All Data</div>
+            </div>
+          </div>
+        </nav>
+
+        <main className="dashboard-content">
+          {/* Phase 7A: Breadcrumb Navigation */}
+          <div className="breadcrumb">
+            <div className="breadcrumb-item">
+              <span>Food Bank Manager</span>
+            </div>
+            <span className="breadcrumb-separator">›</span>
+            <div className="breadcrumb-item breadcrumb-current">
+              {activeTab === 'overview' && (
+                <>
+                  <span>Overview</span>
+                  {activeOverviewSection !== 'dashboard' && (
+                    <>
+                      <span className="breadcrumb-separator">›</span>
+                      <span>
+                        {activeOverviewSection === 'inventory' && 'Inventory Management'}
+                        {activeOverviewSection === 'units' && 'Unit Configuration'}
+                        {activeOverviewSection === 'reports' && 'Analytics'}
+                        {activeOverviewSection === 'distributions' && 'Distribution History'}
+                      </span>
+                    </>
+                  )}
+                </>
+              )}
+              {activeTab === 'dataentry' && (
+                <>
+                  <span>Food Intake</span>
+                </>
+              )}
+              {activeTab === 'distribution' && (
+                <>
+                  <span>Distribution</span>
+                </>
+              )}
+              {activeTab === 'myplate' && (
+                <>
+                  <span>MyPlate Analysis</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {activeTab === 'overview' && (
+            <div className="overview-tab">
+              {getTotalInventory() === 0 ? (
+                <div className="empty-state">
+                  <h2>No Inventory Data Yet</h2>
+                  <p>Get started by adding your current inventory using the "Data Entry" tab.</p>
                   <button 
-                    className={`nav-tab ${activeOverviewSection === 'dashboard' ? 'active' : ''}`}
-                    onClick={() => setActiveOverviewSection('dashboard')}
+                    className="btn btn-primary btn-large"
+                    onClick={() => setActiveTab('dataentry')}
                   >
-                    Dashboard
-                  </button>
-                  <button 
-                    className={`nav-tab ${activeOverviewSection === 'inventory' ? 'active' : ''}`}
-                    onClick={() => setActiveOverviewSection('inventory')}
-                  >
-                    Inventory
-                  </button>
-                  <button 
-                    className={`nav-tab ${activeOverviewSection === 'units' ? 'active' : ''}`}
-                    onClick={() => setActiveOverviewSection('units')}
-                  >
-                    Units
-                  </button>
-                  <button 
-                    className={`nav-tab ${activeOverviewSection === 'reports' ? 'active' : ''}`}
-                    onClick={() => setActiveOverviewSection('reports')}
-                  >
-                    Analytics
-                  </button>
-                  <button 
-                    className={`nav-tab ${activeOverviewSection === 'distributions' ? 'active' : ''}`}
-                    onClick={() => setActiveOverviewSection('distributions')}
-                  >
-                    Distributions
+                    Start Adding Inventory
                   </button>
                 </div>
-
-                {/* Dashboard Section */}
-                {activeOverviewSection === 'dashboard' && (
-              <div className="overview-grid">
-                <div className="overview-section">
-                      <div className="section-header">
-                  <h2>Current Inventory Distribution</h2>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-gray-700">Show in:</span>
-                          <div className="flex rounded-md shadow-sm">
-                            <button
-                              onClick={() => setOrderingUnit('POUND')}
-                              className={`px-3 py-1 text-sm font-medium rounded-l-md ${
-                                orderingUnit === 'POUND'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-white text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              Pounds
-                            </button>
-                            <button
-                              onClick={() => setOrderingUnit('CASE')}
-                              className={`px-3 py-1 text-sm font-medium ${
-                                orderingUnit === 'CASE'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-white text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              Cases
-                            </button>
-                            <button
-                              onClick={() => setOrderingUnit('PALLET')}
-                              className={`px-3 py-1 text-sm font-medium rounded-r-md ${
-                                orderingUnit === 'PALLET'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-white text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              Pallets
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                  {/* Pie Chart Section */}
-                  <div style={{ width: '100%', height: 320, margin: '32px 0' }}>
-                    <ResponsiveContainer>
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={110}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
-                        >
-                          {pieData.map((entry) => (
-                            <Cell key={`cell-${entry.name}`} fill={CATEGORY_COLORS[entry.name] || '#343a40'} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => `${value.toLocaleString()} lbs`} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+              ) : (
+                <div className="overview-content">
+                  {/* Phase 7A: Enhanced Overview Navigation */}
+                  <div className="nav-with-icons" style={{ marginBottom: '24px' }}>
+                    <button 
+                      className={`nav-tab ${activeOverviewSection === 'dashboard' ? 'active' : ''}`}
+                      onClick={() => setActiveOverviewSection('dashboard')}
+                    >
+                      Dashboard
+                    </button>
+                    <button 
+                      className={`nav-tab ${activeOverviewSection === 'inventory' ? 'active' : ''}`}
+                      onClick={() => setActiveOverviewSection('inventory')}
+                    >
+                      Inventory
+                    </button>
+                    <button 
+                      className={`nav-tab ${activeOverviewSection === 'units' ? 'active' : ''}`}
+                      onClick={() => setActiveOverviewSection('units')}
+                    >
+                      Units
+                    </button>
+                    <button 
+                      className={`nav-tab ${activeOverviewSection === 'reports' ? 'active' : ''}`}
+                      onClick={() => setActiveOverviewSection('reports')}
+                    >
+                      Analytics
+                    </button>
+                    <button 
+                      className={`nav-tab ${activeOverviewSection === 'distributions' ? 'active' : ''}`}
+                      onClick={() => setActiveOverviewSection('distributions')}
+                    >
+                      Distributions
+                    </button>
                   </div>
-                  {/* End Pie Chart Section */}
-                  <div className="category-grid">
-                    {Object.entries(currentInventory).map(([category, weight]) => {
-                      const total = getTotalInventory();
-                      const percentage = total > 0 ? ((weight / total) * 100).toFixed(1) : '0.0';
-                      const isOverTarget = parseFloat(percentage) > 20;
-                      const isUnderTarget = parseFloat(percentage) < 5 && total > 0;
-                      
-                      return (
-                        <div key={category} className={`category-card ${isOverTarget ? 'over-target' : isUnderTarget ? 'under-target' : ''}`}>
-                          <h4>{category}</h4>
-                              <p className="weight">{formatInventoryValue(weight, category)}</p>
-                          <p className="percentage">{percentage}%</p>
-                          <div className="category-status">
-                            {isOverTarget && <span className="status-badge over">OVER</span>}
-                            {isUnderTarget && <span className="status-badge under">UNDER</span>}
-                            {!isOverTarget && !isUnderTarget && <span className="status-badge okay">OKAY</span>}
-                          </div>
-                              {orderingUnit !== 'pounds' && (
-                                <p className="weight-conversion">
-                                  ({weight.toLocaleString()} lbs)
-                                </p>
-                              )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
 
-                <div className="overview-section">
-                      <h2>Critical Alerts & Warnings</h2>
-                      <div className="alerts-feed">
-                        {combinedAlerts.length === 0 ? (
-                          <div className="no-alerts">
-                            <p>No critical alerts at this time</p>
-                            <p>All systems are operating within normal parameters.</p>
-                          </div>
-                        ) : (
-                          combinedAlerts.slice(0, 8).map((alert, index) => (
-                            <div key={index} className={`alert-item ${alert.type.toLowerCase()}`}> 
-                              <div className="alert-icon">
-                                {alert.type}
-                              </div>
-                              <div className="alert-content">
-                                <p className="alert-message">{alert.message}</p>
-                                {alert.action && <p className="alert-action">{alert.action}</p>}
-                              </div>
-                              <div className={`alert-priority ${alert.priority}`}>{alert.priority.toUpperCase()}</div>
+                  {/* Dashboard Section */}
+                  {activeOverviewSection === 'dashboard' && (
+                <div className="overview-grid">
+                  <div className="overview-section">
+                        <div className="section-header">
+                    <h2>Current Inventory Distribution</h2>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium text-gray-700">Show in:</span>
+                            <div className="flex rounded-md shadow-sm">
+                              <button
+                                onClick={() => setOrderingUnit('POUND')}
+                                className={`px-3 py-1 text-sm font-medium rounded-l-md ${
+                                  orderingUnit === 'POUND'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                Pounds
+                              </button>
+                              <button
+                                onClick={() => setOrderingUnit('CASE')}
+                                className={`px-3 py-1 text-sm font-medium ${
+                                  orderingUnit === 'CASE'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                Cases
+                              </button>
+                              <button
+                                onClick={() => setOrderingUnit('PALLET')}
+                                className={`px-3 py-1 text-sm font-medium rounded-r-md ${
+                                  orderingUnit === 'PALLET'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                Pallets
+                              </button>
                             </div>
-                          ))
-                        )}
-                      </div>
-                </div>
-
-                <div className="overview-section">
-                  <h2>Quick Actions</h2>
-                  <div className="quick-actions">
-                    <button 
-                      className="btn btn-primary"
-                          onClick={() => setActiveTab('dataentry')}
-                    >
-                      Add Inventory
-                    </button>
-                    <button 
-                      className="btn btn-secondary"
-                      onClick={() => setActiveTab('myplate')}
-                    >
-                      Check MyPlate
-                    </button>
-                    <button 
-                      className="btn btn-secondary"
-                          onClick={() => setActiveOverviewSection('inventory')}
-                    >
-                          Manage Inventory
-                    </button>
-                    <button 
-                      className="btn btn-danger"
-                      onClick={resetAllData}
-                    >
-                      Reset All Data
-                    </button>
+                          </div>
+                        </div>
+                    {/* Pie Chart Section */}
+                    <div style={{ width: '100%', height: 320, margin: '32px 0' }}>
+                      <ResponsiveContainer>
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={110}
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                          >
+                            {pieData.map((entry) => (
+                              <Cell key={`cell-${entry.name}`} fill={CATEGORY_COLORS[entry.name] || '#343a40'} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => `${value.toLocaleString()} lbs`} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {/* End Pie Chart Section */}
+                    <div className="category-grid">
+                      {Object.entries(currentInventory).map(([category, weight]) => {
+                        const total = getTotalInventory();
+                        const percentage = total > 0 ? ((weight / total) * 100).toFixed(1) : '0.0';
+                        const isOverTarget = parseFloat(percentage) > 20;
+                        const isUnderTarget = parseFloat(percentage) < 5 && total > 0;
+                        
+                        return (
+                          <div key={category} className={`category-card ${isOverTarget ? 'over-target' : isUnderTarget ? 'under-target' : ''}`}>
+                            <h4>{category}</h4>
+                                <p className="weight">{formatInventoryValue(weight, category)}</p>
+                            <p className="percentage">{percentage}%</p>
+                            <div className="category-status">
+                              {isOverTarget && <span className="status-badge over">OVER</span>}
+                              {isUnderTarget && <span className="status-badge under">UNDER</span>}
+                              {!isOverTarget && !isUnderTarget && <span className="status-badge okay">OKAY</span>}
+                            </div>
+                                {orderingUnit !== 'pounds' && (
+                                  <p className="weight-conversion">
+                                    ({weight.toLocaleString()} lbs)
+                                  </p>
+                                )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                    <div className="overview-section">
-                      <h2>Recent Distributions</h2>
-                      <div className="distribution-feed">
-                        {distributionHistory.length === 0 ? (
-                          <div className="no-distributions">
-                            <p>No distributions recorded yet</p>
-                            <p>Start recording distributions to track outgoing food.</p>
+                  <div className="overview-section">
+                        <h2>Critical Alerts & Warnings</h2>
+                        <div className="alerts-feed">
+                          {combinedAlerts.length === 0 ? (
+                            <div className="no-alerts">
+                              <p>No critical alerts at this time</p>
+                              <p>All systems are operating within normal parameters.</p>
+                            </div>
+                          ) : (
+                            combinedAlerts.slice(0, 8).map((alert, index) => (
+                              <div key={index} className={`alert-item ${alert.type.toLowerCase()}`}> 
+                                <div className="alert-icon">
+                                  {alert.type}
+                                </div>
+                                <div className="alert-content">
+                                  <p className="alert-message">{alert.message}</p>
+                                  {alert.action && <p className="alert-action">{alert.action}</p>}
+                                </div>
+                                <div className={`alert-priority ${alert.priority}`}>{alert.priority.toUpperCase()}</div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                  </div>
+
+                  <div className="overview-section">
+                    <h2>Quick Actions</h2>
+                    <div className="quick-actions">
+                      <button 
+                        className="btn btn-primary"
+                            onClick={() => setActiveTab('dataentry')}
+                      >
+                        Add Inventory
+                      </button>
+                      <button 
+                        className="btn btn-secondary"
+                        onClick={() => setActiveTab('myplate')}
+                      >
+                        Check MyPlate
+                      </button>
+                      <button 
+                        className="btn btn-secondary"
+                            onClick={() => setActiveOverviewSection('inventory')}
+                      >
+                            Manage Inventory
+                      </button>
+                      <button 
+                        className="btn btn-danger"
+                        onClick={resetAllData}
+                      >
+                        Reset All Data
+                      </button>
+                    </div>
+                  </div>
+
+                      <div className="overview-section">
+                        <h2>Recent Distributions</h2>
+                        <div className="distribution-feed">
+                          {distributionHistory.length === 0 ? (
+                            <div className="no-distributions">
+                              <p>No distributions recorded yet</p>
+                              <p>Start recording distributions to track outgoing food.</p>
               </div>
-                        ) : (
-                          distributionHistory.slice(0, 5).map((distribution, index) => (
-                            <div key={index} className="distribution-item">
-                              <div className="distribution-icon">OUT</div>
-                              <div className="distribution-content">
-                                <p className="distribution-message">
-                                  {distribution.totalDistributed?.toFixed(1)} lbs to {distribution.recipient}
-                                </p>
-                                <p className="distribution-details">
-                                  {distribution.clientsServed} clients • {new Date(distribution.date).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <div className="distribution-weight">
-                                {distribution.totalDistributed?.toFixed(0)} lbs
-                              </div>
-                            </div>
-                          ))
+                            ) : (
+                              distributionHistory.slice().sort(sortDistributionsByRecency).slice(0, 5).map((distribution, index) => (
+                                <div key={index} className="distribution-item">
+                                  <div className="distribution-icon">OUT</div>
+                                  <div className="distribution-content">
+                                    <p className="distribution-message">
+                                      {distribution.totalDistributed?.toFixed(1)} lbs to {distribution.recipient}
+                                    </p>
+                                    <p className="distribution-details">
+                                      {distribution.clientsServed} clients • {new Date(distribution.date).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <div className="distribution-weight">
+                                    {distribution.totalDistributed?.toFixed(0)} lbs
+                                  </div>
+                                </div>
+                              ))
             )}
           </div>
                       {distributionHistory.length > 5 && (
@@ -1476,7 +1526,7 @@ System Health Check:
                         </div>
                       ) : (
                         <div className="distribution-table">
-                          {distributionHistory.slice(0, 20).map((distribution, index) => (
+                          {distributionHistory.slice().sort(sortDistributionsByRecency).slice(0, 20).map((distribution, index) => (
                             <div key={index} className="distribution-row">
                               <div className="distribution-date">
                                 {new Date(distribution.date).toLocaleDateString()}
@@ -1546,6 +1596,7 @@ System Health Check:
         type={confirmationDialog.type}
       />
     </div>
+    </>
   );
 };
 

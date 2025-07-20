@@ -194,20 +194,22 @@ class FirestoreService {
   }
 
   // FIXED: Load distributions from the correct user subcollection
-  async getUserDistributions(userId, limitCount = 50) {
+  async getUserDistributions(userId, limitCount = 1000) {
     try {
       const q = query(
         collection(db, 'users', userId, 'distributions'),
-        orderBy('date', 'desc'),
+        orderBy('createdAt', 'desc'),
         limit(limitCount)
       );
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
+      const data = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+      console.log('Loaded user distributions from Firestore:', data);
+      return data;
     } catch (error) {
-      console.error('Error getting distributions:', error);
+      console.error('Error getting user distributions:', error);
       throw error;
     }
   }
@@ -537,25 +539,17 @@ class FirestoreService {
     }
   }
 
-  // Get all distributions for a user
-  async getDistributionHistory(userId) {
-    try {
-      const colRef = collection(db, 'users', userId, 'distributions');
-      const snapshot = await getDocs(colRef);
-      return snapshot.docs.map(doc => doc.data());
-    } catch (error) {
-      console.error('Error getting distribution history:', error);
-      throw error;
-    }
-  }
-
   // Add a new distribution record
   async addDistributionRecord(userId, distribution) {
     try {
       const colRef = collection(db, 'users', userId, 'distributions');
-      await addDoc(colRef, distribution);
+      const docRef = await addDoc(colRef, {
+        ...distribution,
+        createdAt: serverTimestamp()
+      });
+      console.log('[FIRESTORE] Saved distribution:', docRef.id, distribution);
     } catch (error) {
-      console.error('Error adding distribution record:', error);
+      console.error('[FIRESTORE] Error adding distribution record:', error, distribution);
       throw error;
     }
   }
