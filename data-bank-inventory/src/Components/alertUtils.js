@@ -144,17 +144,21 @@ export function generateItemAlerts(detailedInventory, UnitConverters) {
         // Expiration alerts
         if (expDate <= today) {
           newAlerts.push({
-            type: 'EXPIRED',
-            severity: 'critical',
+            type: 'CRITICAL',
+            category: 'EXPIRED_ITEM',
             message: `${item.name} has expired (${item.expiration})`,
+            action: 'Remove from inventory immediately',
+            priority: 'high',
             item,
             source: 'item'
           });
         } else if (expDate <= weekFromNow) {
           newAlerts.push({
-            type: 'EXPIRING_SOON',
-            severity: 'warning',
+            type: 'WARNING',
+            category: 'EXPIRING_SOON',
             message: `${item.name} expires soon (${item.expiration})`,
+            action: 'Prioritize for distribution',
+            priority: 'medium',
             item,
             source: 'item'
           });
@@ -163,9 +167,11 @@ export function generateItemAlerts(detailedInventory, UnitConverters) {
         const pallets = UnitConverters.convertFromStandardWeight(item.weight, 'PALLET', category);
         if (pallets < 5) { // Configurable threshold
           newAlerts.push({
-            type: 'LOW_STOCK',
-            severity: 'info',
-            message: `${item.name} is running low (${pallets.toFixed(1)} pallets equivalent)` ,
+            type: 'INFO',
+            category: 'LOW_STOCK',
+            message: `${item.name} is running low (${pallets.toFixed(1)} pallets equivalent)`,
+            action: 'Consider restocking',
+            priority: 'low',
             item,
             source: 'item'
           });

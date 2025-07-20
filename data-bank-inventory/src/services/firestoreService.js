@@ -512,6 +512,54 @@ class FirestoreService {
     }
   }
 
+  // Daily metrics operations
+  async getTodayMetrics(userId, dateString) {
+    try {
+      const metricsRef = doc(db, 'users', userId, 'metrics', dateString);
+      const docSnap = await getDoc(metricsRef);
+      return docSnap.exists() ? docSnap.data() : null;
+    } catch (error) {
+      console.error('Error getting today\'s metrics:', error);
+      throw error;
+    }
+  }
+
+  async setTodayMetrics(userId, dateString, metrics) {
+    try {
+      const metricsRef = doc(db, 'users', userId, 'metrics', dateString);
+      await setDoc(metricsRef, {
+        ...metrics,
+        lastUpdated: new Date()
+      });
+    } catch (error) {
+      console.error('Error setting today\'s metrics:', error);
+      throw error;
+    }
+  }
+
+  // Get all distributions for a user
+  async getDistributionHistory(userId) {
+    try {
+      const colRef = collection(db, 'users', userId, 'distributions');
+      const snapshot = await getDocs(colRef);
+      return snapshot.docs.map(doc => doc.data());
+    } catch (error) {
+      console.error('Error getting distribution history:', error);
+      throw error;
+    }
+  }
+
+  // Add a new distribution record
+  async addDistributionRecord(userId, distribution) {
+    try {
+      const colRef = collection(db, 'users', userId, 'distributions');
+      await addDoc(colRef, distribution);
+    } catch (error) {
+      console.error('Error adding distribution record:', error);
+      throw error;
+    }
+  }
+
   // Cleanup listeners
   unsubscribeAll(userId) {
     const userListeners = Array.from(this.listeners.keys()).filter(key => 

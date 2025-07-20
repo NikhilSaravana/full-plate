@@ -3,7 +3,7 @@ import { getMyPlateCategory } from './FoodCategoryMapper';
 import { UnitConverters } from './UnitConfiguration';
 import { getCombinedAlerts } from './alertUtils';
 
-const InventoryManager = ({ currentInventory, onNavigate }) => {
+const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {} }) => {
   const [detailedInventory, setDetailedInventory] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -40,11 +40,13 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
     }, 0);
   };
 
-  // Remove alerts state and generate combined alerts
+  const totalFromSummary = Object.values(currentInventory || {}).reduce((sum, val) => sum + val, 0);
+
+  // Generate combined alerts with proper outgoingMetrics
   const combinedAlerts = getCombinedAlerts({
     currentInventory,
-    memoizedTotalInventory: getTotalDetailedInventory(),
-    outgoingMetrics: {}, // If you have outgoingMetrics, pass it here
+    memoizedTotalInventory: totalFromSummary, // Use summary total for consistency
+    outgoingMetrics,
     detailedInventory,
     UnitConverters
   });
@@ -154,8 +156,6 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
     category && category.items && category.items.length > 0
   );
 
-  const totalFromSummary = Object.values(currentInventory || {}).reduce((sum, val) => sum + val, 0);
-
   return (
     <div className="inventory-manager">
       <div className="inventory-header">
@@ -213,9 +213,10 @@ const InventoryManager = ({ currentInventory, onNavigate }) => {
               <h3>Inventory Alerts</h3>
               <div className="alerts-list">
                 {combinedAlerts.map((alert, index) => (
-                  <div key={index} className={`alert alert-${alert.type ? alert.type.toLowerCase() : alert.severity}`}> 
-                    <span className="alert-icon">{alert.type || alert.severity}</span>
+                  <div key={index} className={`alert alert-${alert.type.toLowerCase()}`}> 
+                    <span className="alert-icon">{alert.type}</span>
                     <span className="alert-message">{alert.message}</span>
+                    {alert.action && <span className="alert-action">{alert.action}</span>}
                     {alert.item && <span className="alert-weight">{alert.item.weight} lbs</span>}
                   </div>
                 ))}

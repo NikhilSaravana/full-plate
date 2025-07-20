@@ -70,6 +70,15 @@ const Dashboard = () => {
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [autoSaveStatus, setAutoSaveStatus] = useState('');
 
+  // Enhanced Distribution Tracking
+  const [distributionHistory, setDistributionHistory] = useState([]);
+  const [outgoingMetrics, setOutgoingMetrics] = useState({
+    totalDistributedToday: 0,
+    totalDistributedWeek: 0,
+    clientsServedToday: 0,
+    avgDistributionSize: 0
+  });
+
   // Helper to get namespaced key
   const nsKey = (base) => currentUser ? `${base}_${currentUser.uid}` : base;
 
@@ -115,15 +124,35 @@ const Dashboard = () => {
   // Helper to get today's date string
   const getTodayString = () => new Date().toISOString().split('T')[0];
 
-  // Remove distributedToday localStorage logic
-  // Enhanced Distribution Tracking
-  const [distributionHistory, setDistributionHistory] = useState([]);
-  const [outgoingMetrics, setOutgoingMetrics] = useState({
-    totalDistributedToday: 0,
-    totalDistributedWeek: 0,
-    clientsServedToday: 0,
-    avgDistributionSize: 0
-  });
+  // Load today's metrics from Firestore on login
+  useEffect(() => {
+    if (!currentUser) return;
+    const today = getTodayString();
+    firestoreService.getTodayMetrics(currentUser.uid, today)
+      .then(data => {
+        if (data) {
+          setOutgoingMetrics({
+            totalDistributedToday: data.totalDistributedToday || 0,
+            totalDistributedWeek: data.totalDistributedWeek || 0,
+            clientsServedToday: data.clientsServedToday || 0,
+            avgDistributionSize: data.avgDistributionSize || 0
+          });
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load today's metrics from Firestore:", err);
+      });
+  }, [currentUser]);
+
+  // Save outgoingMetrics to Firestore whenever it changes
+  useEffect(() => {
+    if (!currentUser) return;
+    const today = getTodayString();
+    firestoreService.setTodayMetrics(currentUser.uid, today, outgoingMetrics)
+      .catch(err => {
+        console.error("Failed to save today's metrics to Firestore:", err);
+      });
+  }, [outgoingMetrics, currentUser]);
 
   // Unit Toggle System for ordering calculations
   const [orderingUnit, setOrderingUnit] = useState('POUND'); // Default to POUND
@@ -322,6 +351,7 @@ const Dashboard = () => {
 
   // --- Load distributionHistory from Firestore on login --- REMOVED: This is now handled by the new system above
 
+  /*
   // --- Calculate outgoingMetrics from distributionHistory ---
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -342,6 +372,7 @@ const Dashboard = () => {
       avgDistributionSize: avgSize
     });
   }, [distributionHistory]);
+*/
 
   // Unit conversion functions
   const getUnitWeight = (category, unit) => {
@@ -677,19 +708,40 @@ System Health Check:
     }
   }, [currentUser, connectionStatus.connected]);
 
-  // When a distribution is submitted, always update state and localStorage
+  // Load distributionHistory from Firestore on login
+  useEffect(() => {
+    if (!currentUser) return;
+    firestoreService.getDistributionHistory(currentUser.uid)
+      .then(history => {
+        if (Array.isArray(history)) {
+          setDistributionHistory(history.sort((a, b) => new Date(b.date) - new Date(a.date)));
+          // Calculate today's totals
+          const today = new Date().toISOString().split('T')[0];
+          const todaysDistributions = history.filter(dist => dist.date === today);
+          const totalToday = todaysDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
+          const clientsToday = todaysDistributions.reduce((sum, dist) => sum + (dist.clientsServed || 0), 0);
+          setOutgoingMetrics(prev => ({
+            ...prev,
+            totalDistributedToday: totalToday,
+            clientsServedToday: clientsToday
+          }));
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load distribution history from Firestore:', err);
+      });
+  }, [currentUser]);
+
+  // When a distribution is submitted, always update state and Firestore
   const handleSurveySubmit = async (surveyData) => {
     console.log('Survey data received:', surveyData);
-    
     // Update inventory based on survey data
     setCurrentInventory(prev => {
       const updated = { ...prev };
-      
       if (surveyData.type === 'DISTRIBUTION') {
         Object.entries(surveyData.categoryTotals).forEach(([category, weight]) => {
           updated[category] = Math.max(0, (updated[category] || 0) - weight);
         });
-        // Explicitly save to Firestore after processing a distribution
         if (currentUser) {
           firestoreService.saveInventory(currentUser.uid, updated);
         }
@@ -697,7 +749,6 @@ System Health Check:
         Object.entries(surveyData.categoryTotals).forEach(([category, weight]) => {
           updated[category] = (updated[category] || 0) + weight;
         });
-        // Explicitly save to Firestore after adding inventory
         if (currentUser) {
           firestoreService.saveInventory(currentUser.uid, updated);
         }
@@ -709,14 +760,12 @@ System Health Check:
     const activityMessage = surveyData.type === 'DISTRIBUTION' 
       ? `Distributed ${surveyData.totalDistributed.toFixed(1)} lbs to ${surveyData.clientsServed || '?'} clients (${surveyData.recipient})`
       : `Added ${surveyData.items?.length || 0} items from ${surveyData.source}`;
-
     const newActivity = {
       type: surveyData.type,
       message: activityMessage,
       time: 'Just now',
       timestamp: new Date().toISOString()
     };
-
     setRecentActivity(prev => [newActivity, ...prev.slice(0, 19)]); // Keep last 20 activities
 
     // Handle distribution tracking
@@ -738,26 +787,20 @@ System Health Check:
         console.log('[SUBMIT] distribution saved:', distributionRecord);
         return updated;
       });
-
-      // Save to cloud if connected
-      if (currentUser && connectionStatus.connected) {
+      // Save to Firestore
+      if (currentUser) {
         try {
-          const cloudId = await firestoreService.saveDistribution(currentUser.uid, distributionRecord);
-          if (cloudId) {
-            // Update local record with cloud ID
-            setDistributionHistory(prev => 
-              prev.map((dist, index) => 
-                index === 0 ? { ...dist, id: cloudId } : dist
-              )
-            );
-          }
-        } catch (error) {
-          console.error('Failed to save distribution to cloud:', error);
-          setPendingChanges(true);
+          await firestoreService.addDistributionRecord(currentUser.uid, distributionRecord);
+        } catch (err) {
+          console.error('Failed to save distribution to Firestore:', err);
         }
-      } else if (currentUser) {
-        setPendingChanges(true);
       }
+      // Update outgoingMetrics
+      setOutgoingMetrics(prev => ({
+        ...prev,
+        totalDistributedToday: prev.totalDistributedToday + (surveyData.totalDistributed || 0),
+        clientsServedToday: prev.clientsServedToday + (surveyData.clientsServed || 0)
+      }));
     }
 
     // Mark as no longer first time
@@ -843,135 +886,6 @@ System Health Check:
       console.error('Failed to log out:', error);
     }
   };
-
-  // Critical Alerts System with performance optimization
-  const getCriticalAlerts = React.useMemo(() => {
-    const alerts = [];
-    const total = memoizedTotalInventory;
-    const targetCapacity = SYSTEM_CONFIG.TARGET_CAPACITY;
-
-    // Low inventory alerts
-    Object.entries(currentInventory).forEach(([category, weight]) => {
-      const percentage = total > 0 ? (weight / total) * 100 : 0;
-      if (percentage < 5 && total > 0) {
-        alerts.push({
-          type: 'CRITICAL',
-          category: 'LOW_INVENTORY',
-          message: `${category} inventory critically low (${percentage.toFixed(1)}%)`,
-          action: 'Consider immediate restocking',
-          priority: 'high'
-        });
-      } else if (percentage < 10 && total > 0) {
-        alerts.push({
-          type: 'WARNING',
-          category: 'LOW_INVENTORY',
-          message: `${category} inventory low (${percentage.toFixed(1)}%)`,
-          action: 'Plan for restocking soon',
-          priority: 'medium'
-        });
-      }
-    });
-
-    // MyPlate compliance alerts
-    const myplateCompliance = { compliantCategories: 0 };
-    if (total > 0) {
-      const vegPercentage = (currentInventory.VEG / total) * 100;
-      const fruitPercentage = (currentInventory.FRUIT / total) * 100;
-      const proteinPercentage = (currentInventory.PROTEIN / total) * 100;
-      const dairyPercentage = (currentInventory.DAIRY / total) * 100;
-      const grainPercentage = (currentInventory.GRAIN / total) * 100;
-      
-      const vegOK = vegPercentage >= 13 && vegPercentage <= 17;
-      const fruitOK = fruitPercentage >= 13 && fruitPercentage <= 17;
-      const proteinOK = proteinPercentage >= 18 && proteinPercentage <= 22;
-      const dairyOK = dairyPercentage >= 2 && dairyPercentage <= 4;
-      const grainOK = grainPercentage >= 13 && grainPercentage <= 17;
-      
-      myplateCompliance.compliantCategories = [vegOK, fruitOK, proteinOK, dairyOK, grainOK].filter(Boolean).length;
-    }
-    if (myplateCompliance.compliantCategories < 3) {
-      alerts.push({
-        type: 'WARNING',
-        category: 'MYPLATE_IMBALANCE',
-        message: `Only ${myplateCompliance.compliantCategories}/5 MyPlate categories are balanced`,
-        action: 'Review distribution targets',
-        priority: 'medium'
-      });
-    }
-
-    // Capacity alerts
-    const utilization = parseFloat(getCapacityUtilization());
-    if (utilization > 90) {
-      alerts.push({
-        type: 'CRITICAL',
-        category: 'CAPACITY_WARNING',
-        message: `Warehouse at ${utilization}% capacity`,
-        action: 'Increase distributions immediately',
-        priority: 'high'
-      });
-    } else if (utilization > 75) {
-      alerts.push({
-        type: 'WARNING',
-        category: 'CAPACITY_WARNING',
-        message: `Warehouse at ${utilization}% capacity`,
-        action: 'Plan for increased distributions',
-        priority: 'medium'
-      });
-    }
-
-    // Distribution efficiency alerts
-    if (outgoingMetrics.totalDistributedToday === 0 && total > 0) {
-      alerts.push({
-        type: 'WARNING',
-        category: 'NO_DISTRIBUTIONS',
-        message: 'No distributions recorded today',
-        action: 'Consider scheduling distributions to serve community',
-        priority: 'medium'
-      });
-    }
-
-    // Stagnant inventory alerts
-    const weeklyDistributionRate = total > 0 ? (outgoingMetrics.totalDistributedWeek / total) * 100 : 0;
-    if (weeklyDistributionRate < 5 && total > 10000) {
-      alerts.push({
-        type: 'WARNING',
-        category: 'STAGNANT_INVENTORY',
-        message: `Low distribution rate (${weeklyDistributionRate.toFixed(1)}% of inventory distributed this week)`,
-        action: 'Increase outreach and distribution activities',
-        priority: 'medium'
-      });
-    }
-
-    // High inventory distribution opportunity
-    Object.entries(currentInventory).forEach(([category, weight]) => {
-      const percentage = total > 0 ? (weight / total) * 100 : 0;
-      if (percentage > 25) {
-        alerts.push({
-          type: 'INFO',
-          category: 'DISTRIBUTION_OPPORTUNITY',
-          message: `${category} has high inventory (${percentage.toFixed(1)}%)`,
-          action: 'Good opportunity for targeted distribution',
-          priority: 'low'
-        });
-      }
-    });
-
-    // Distribution efficiency opportunities
-    if (outgoingMetrics.avgDistributionSize > 0 && outgoingMetrics.avgDistributionSize < 100) {
-      alerts.push({
-        type: 'INFO',
-        category: 'DISTRIBUTION_EFFICIENCY',
-        message: `Average distribution size is ${outgoingMetrics.avgDistributionSize.toFixed(1)} lbs`,
-        action: 'Consider larger bulk distributions for efficiency',
-        priority: 'low'
-      });
-    }
-
-    return alerts.sort((a, b) => {
-      const priorityOrder = { high: 3, medium: 2, low: 1 };
-      return priorityOrder[b.priority] - priorityOrder[a.priority];
-    });
-  }, [currentInventory, memoizedTotalInventory, outgoingMetrics]);
 
   // Firebase connection state monitoring
   useEffect(() => {
@@ -1367,15 +1281,15 @@ System Health Check:
                           </div>
                         ) : (
                           combinedAlerts.slice(0, 8).map((alert, index) => (
-                            <div key={index} className={`alert-item ${alert.type ? alert.type.toLowerCase() : alert.severity}`}> 
+                            <div key={index} className={`alert-item ${alert.type.toLowerCase()}`}> 
                               <div className="alert-icon">
-                                {alert.type || alert.severity}
+                                {alert.type}
                               </div>
                               <div className="alert-content">
                                 <p className="alert-message">{alert.message}</p>
                                 {alert.action && <p className="alert-action">{alert.action}</p>}
                               </div>
-                              <div className={`alert-priority ${alert.priority || alert.severity}`}>{(alert.priority || alert.severity)?.toUpperCase()}</div>
+                              <div className={`alert-priority ${alert.priority}`}>{alert.priority.toUpperCase()}</div>
                             </div>
                           ))
                         )}
@@ -1457,6 +1371,7 @@ System Health Check:
           <InventoryManager 
             currentInventory={currentInventory} 
             onNavigate={setActiveTab}
+            outgoingMetrics={outgoingMetrics}
           />
         )}
 
