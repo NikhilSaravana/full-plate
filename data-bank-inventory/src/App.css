@@ -4124,3 +4124,9 @@
   gap: 12px;
   justify-content: center;
 }
+
+.item-row-empty {
+  border: 2px solid #e74c3c !important;
+  background: #fff6f6 !important;
+  border-radius: 6px;
+}

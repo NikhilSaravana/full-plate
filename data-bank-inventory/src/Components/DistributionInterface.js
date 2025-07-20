@@ -18,6 +18,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
   });
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationConfig, setConfirmationConfig] = useState({});
+  const [emptyItemIndices, setEmptyItemIndices] = useState([]);
 
   const availableUnits = UnitConverters.getAvailableUnits();
 
@@ -61,11 +62,15 @@ const DistributionInterface = ({ onDataSubmit }) => {
   };
 
   const submitDistribution = () => {
-    if (items.some(item => !item.foodType || !item.quantity)) {
+    const emptyIndices = items
+      .map((item, idx) => (!item.foodType || !item.quantity) ? idx : null)
+      .filter(idx => idx !== null);
+    setEmptyItemIndices(emptyIndices);
+    if (emptyIndices.length > 0) {
       setConfirmationConfig({
         type: 'error',
         title: 'Missing Information',
-        message: 'Please fill in all required fields (Food Type and Quantity) before recording the distribution.',
+        message: 'Please fill in all required fields (Food Type and Quantity) or remove unused line items before recording the distribution. Empty lines are highlighted.',
         confirmText: 'OK',
         onConfirm: () => setShowConfirmation(false)
       });
@@ -198,8 +203,18 @@ const DistributionInterface = ({ onDataSubmit }) => {
                 <button
                   key={item}
                   onClick={() => {
+                    // Find first empty item (no foodType and no quantity)
+                    const emptyIndex = items.findIndex(i => !i.foodType && !i.quantity);
                     const newItem = { foodType: item, quantity: '', unit: 'POUND', notes: '' };
-                    setItems([...items, newItem]);
+                    if (emptyIndex !== -1) {
+                      // Replace the empty item
+                      const updated = [...items];
+                      updated[emptyIndex] = newItem;
+                      setItems(updated);
+                    } else {
+                      // Add a new item
+                      setItems([...items, newItem]);
+                    }
                   }}
                   className="btn btn-light quick-add-item"
                 >
@@ -210,7 +225,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
           </div>
 
           {items.map((item, index) => (
-            <div key={index} className="item-row">
+            <div key={index} className={`item-row${emptyItemIndices.includes(index) ? ' item-row-empty' : ''}`}>
               <div className="item-main-row">
                 <div className="item-inputs">
                   <div className="input-group">
