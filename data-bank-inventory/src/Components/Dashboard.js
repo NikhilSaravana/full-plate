@@ -10,6 +10,7 @@ import firestoreService from '../services/firestoreService';
 import { UnitConverters } from './UnitConfiguration';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getCombinedAlerts } from './alertUtils';
+import { SYSTEM_CONFIG } from './FoodCategoryMapper';
 
 // Default unit configurations for inventory units
 const DEFAULT_UNIT_CONFIGS = {
@@ -737,8 +738,7 @@ System Health Check:
 
   const getCapacityUtilization = () => {
     const total = memoizedTotalInventory;
-    // Default target capacity - could be made configurable
-    const targetCapacity = 900000;
+    const targetCapacity = SYSTEM_CONFIG.TARGET_CAPACITY;
     return total > 0 ? ((total / targetCapacity) * 100).toFixed(1) : '0.0';
   };
 
@@ -813,7 +813,7 @@ System Health Check:
   const getCriticalAlerts = React.useMemo(() => {
     const alerts = [];
     const total = memoizedTotalInventory;
-    const targetCapacity = 900000;
+    const targetCapacity = SYSTEM_CONFIG.TARGET_CAPACITY;
 
     // Low inventory alerts
     Object.entries(currentInventory).forEach(([category, weight]) => {
@@ -1451,7 +1451,7 @@ System Health Check:
                           </div>
                           <p className="capacity-percentage">{getCapacityUtilization()}%</p>
                         </div>
-                        <p>{getTotalInventory().toLocaleString()} / 900,000 lbs</p>
+                        <p>{getTotalInventory().toLocaleString()} / {SYSTEM_CONFIG.TARGET_CAPACITY.toLocaleString()} lbs</p>
                       </div>
                       
                       <div className="analytics-card">
