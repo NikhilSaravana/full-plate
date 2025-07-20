@@ -11,6 +11,11 @@ const MyPlateCalculator = ({ currentInventory = {} }) => {
     calculateMyPlateBalance();
   }, [currentInventory]);
 
+  // Update newCapacity when SYSTEM_CONFIG.TARGET_CAPACITY changes
+  useEffect(() => {
+    setNewCapacity(SYSTEM_CONFIG.TARGET_CAPACITY);
+  }, [SYSTEM_CONFIG.TARGET_CAPACITY]);
+
   const handleCapacityEdit = () => {
     if (isEditingCapacity) {
       updateTargetCapacity(Number(newCapacity));

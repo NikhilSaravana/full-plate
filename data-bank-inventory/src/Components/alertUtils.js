@@ -1,10 +1,11 @@
 // Utility to generate combined alerts for dashboard and inventory
+import { SYSTEM_CONFIG } from './FoodCategoryMapper';
 
 // Category-level alert logic (from Dashboard)
 export function generateCategoryAlerts({ currentInventory, memoizedTotalInventory, outgoingMetrics }) {
   const alerts = [];
   const total = memoizedTotalInventory;
-  const targetCapacity = 900000;
+  const targetCapacity = SYSTEM_CONFIG.TARGET_CAPACITY;
 
   // Low inventory alerts
   Object.entries(currentInventory).forEach(([category, weight]) => {
