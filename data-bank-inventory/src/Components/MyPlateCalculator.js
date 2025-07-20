@@ -1,27 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { MYPLATE_GOALS, SYSTEM_CONFIG, getCategoryStatus, getMyPlateCategory, updateTargetCapacity } from './FoodCategoryMapper';
 
-const MyPlateCalculator = ({ currentInventory = {} }) => {
+const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTargetCapacity }) => {
   const [calculations, setCalculations] = useState({});
   const [summary, setSummary] = useState({});
   const [isEditingCapacity, setIsEditingCapacity] = useState(false);
-  const [newCapacity, setNewCapacity] = useState(SYSTEM_CONFIG.TARGET_CAPACITY);
+  const [newCapacity, setNewCapacity] = useState(targetCapacity);
 
   useEffect(() => {
     calculateMyPlateBalance();
-  }, [currentInventory]);
+    // eslint-disable-next-line
+  }, [currentInventory, targetCapacity, isEditingCapacity]);
 
-  // Update newCapacity when SYSTEM_CONFIG.TARGET_CAPACITY changes
+  // Update newCapacity when targetCapacity changes
   useEffect(() => {
-    setNewCapacity(SYSTEM_CONFIG.TARGET_CAPACITY);
-  }, [SYSTEM_CONFIG.TARGET_CAPACITY]);
+    setNewCapacity(targetCapacity);
+  }, [targetCapacity]);
 
-  const handleCapacityEdit = () => {
+  const handleCapacityEdit = async () => {
     if (isEditingCapacity) {
-      updateTargetCapacity(Number(newCapacity));
-      calculateMyPlateBalance();
+      if (onUpdateTargetCapacity) {
+        await onUpdateTargetCapacity(Number(newCapacity));
+      }
+      setIsEditingCapacity(false);
+      setNewCapacity(targetCapacity);
+      // Force recalculation after save
+      setTimeout(() => calculateMyPlateBalance(), 0);
+      return;
     }
-    setIsEditingCapacity(!isEditingCapacity);
+    setIsEditingCapacity(true);
   };
 
   const handleCapacityChange = (e) => {
@@ -74,7 +81,7 @@ const MyPlateCalculator = ({ currentInventory = {} }) => {
       console.log(`${category}: Current=${currentWeight}lbs (${currentPercentage}%), Goal=${goalPercentage}%, Status=${status}`);
       
       // Calculate target weights
-      const targetWeight = (goalPercentage / 100) * SYSTEM_CONFIG.TARGET_CAPACITY;
+      const targetWeight = (goalPercentage / 100) * targetCapacity;
       const needToOrder = Math.max(0, targetWeight - currentWeight);
       
       // Calculate pallets
@@ -99,8 +106,8 @@ const MyPlateCalculator = ({ currentInventory = {} }) => {
     setCalculations(categoryStats);
     setSummary({
       totalCurrent: grandTotal,
-      targetCapacity: SYSTEM_CONFIG.TARGET_CAPACITY,
-      capacityUtilization: ((grandTotal / SYSTEM_CONFIG.TARGET_CAPACITY) * 100).toFixed(1),
+      targetCapacity: targetCapacity,
+      capacityUtilization: ((grandTotal / targetCapacity) * 100).toFixed(1),
       totalNeedToOrder: Object.values(categoryStats).reduce((sum, cat) => sum + cat.needToOrder, 0)
     });
   };
@@ -132,7 +139,7 @@ const MyPlateCalculator = ({ currentInventory = {} }) => {
               </div>
             ) : (
               <div className="capacity-display">
-                <span>{summary.targetCapacity?.toLocaleString()} lbs</span>
+                <span>{targetCapacity?.toLocaleString()} lbs</span>
                 <button onClick={handleCapacityEdit} className="edit-btn">Edit</button>
               </div>
             )}

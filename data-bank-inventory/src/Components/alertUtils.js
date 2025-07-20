@@ -2,10 +2,9 @@
 import { SYSTEM_CONFIG } from './FoodCategoryMapper';
 
 // Category-level alert logic (from Dashboard)
-export function generateCategoryAlerts({ currentInventory, memoizedTotalInventory, outgoingMetrics }) {
+export function generateCategoryAlerts({ currentInventory, memoizedTotalInventory, outgoingMetrics, targetCapacity }) {
   const alerts = [];
   const total = memoizedTotalInventory;
-  const targetCapacity = SYSTEM_CONFIG.TARGET_CAPACITY;
 
   // Low inventory alerts
   Object.entries(currentInventory).forEach(([category, weight]) => {
@@ -183,8 +182,8 @@ export function generateItemAlerts(detailedInventory, UnitConverters) {
 }
 
 // Combine both sets of alerts
-export function getCombinedAlerts({ currentInventory, memoizedTotalInventory, outgoingMetrics, detailedInventory, UnitConverters }) {
-  const categoryAlerts = generateCategoryAlerts({ currentInventory, memoizedTotalInventory, outgoingMetrics });
+export function getCombinedAlerts({ currentInventory, memoizedTotalInventory, outgoingMetrics, detailedInventory, UnitConverters, targetCapacity }) {
+  const categoryAlerts = generateCategoryAlerts({ currentInventory, memoizedTotalInventory, outgoingMetrics, targetCapacity });
   const itemAlerts = generateItemAlerts(detailedInventory, UnitConverters);
   return [...categoryAlerts, ...itemAlerts];
 } 

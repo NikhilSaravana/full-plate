@@ -10,7 +10,7 @@ import firestoreService from '../services/firestoreService';
 import { UnitConverters } from './UnitConfiguration';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getCombinedAlerts } from './alertUtils';
-import { SYSTEM_CONFIG } from './FoodCategoryMapper';
+import { SYSTEM_CONFIG, setTargetCapacity } from './FoodCategoryMapper';
 
 // Default unit configurations for inventory units
 const DEFAULT_UNIT_CONFIGS = {
@@ -880,9 +880,42 @@ System Health Check:
     return memoizedTotalInventory;
   };
 
+  // Add state for targetCapacity
+  const [targetCapacity, setTargetCapacityState] = useState(SYSTEM_CONFIG.TARGET_CAPACITY);
+
+  // Load targetCapacity from Firestore on login
+  useEffect(() => {
+    if (!currentUser) return;
+    firestoreService.getTargetCapacity(currentUser.uid)
+      .then((capacity) => {
+        setTargetCapacity(capacity);
+        setTargetCapacityState(capacity);
+      })
+      .catch((err) => {
+        console.error('Failed to load target capacity from Firestore:', err);
+      });
+  }, [currentUser]);
+
+  // Function to update targetCapacity in Firestore and state
+  const handleUpdateTargetCapacity = async (newCapacity) => {
+    setTargetCapacity(newCapacity);
+    setTargetCapacityState(newCapacity);
+    if (currentUser) {
+      try {
+        await firestoreService.setTargetCapacity(currentUser.uid, newCapacity);
+        showAutoSaveStatus('Target capacity updated!', false);
+      } catch (err) {
+        console.error('Failed to save target capacity to Firestore:', err);
+        showAutoSaveStatus('Failed to update target capacity', true);
+      }
+    } else {
+      showAutoSaveStatus('Target capacity updated!', false);
+    }
+  };
+
+  // Update getCapacityUtilization to use targetCapacity state
   const getCapacityUtilization = () => {
     const total = memoizedTotalInventory;
-    const targetCapacity = SYSTEM_CONFIG.TARGET_CAPACITY;
     return total > 0 ? ((total / targetCapacity) * 100).toFixed(1) : '0.0';
   };
 
@@ -1008,7 +1041,8 @@ System Health Check:
     memoizedTotalInventory,
     outgoingMetrics,
     detailedInventory,
-    UnitConverters
+    UnitConverters,
+    targetCapacity
   });
 
   console.log('Rendering distributionHistory:', distributionHistory);
@@ -1493,7 +1527,7 @@ System Health Check:
                           </div>
                           <p className="capacity-percentage">{getCapacityUtilization()}%</p>
                         </div>
-                        <p>{getTotalInventory().toLocaleString()} / {SYSTEM_CONFIG.TARGET_CAPACITY.toLocaleString()} lbs</p>
+                        <p>{getTotalInventory().toLocaleString()} / {targetCapacity.toLocaleString()} lbs</p>
                       </div>
                       
                       <div className="analytics-card">
@@ -1611,7 +1645,11 @@ System Health Check:
         )}
 
         {activeTab === 'myplate' && (
-          <MyPlateCalculator currentInventory={currentInventory} />
+          <MyPlateCalculator 
+            currentInventory={currentInventory} 
+            targetCapacity={targetCapacity}
+            onUpdateTargetCapacity={handleUpdateTargetCapacity}
+          />
         )}
       </main>
 

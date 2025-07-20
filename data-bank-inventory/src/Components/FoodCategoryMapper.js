@@ -135,27 +135,19 @@ export const MYPLATE_GOALS = {
 // System Configuration
 export const SYSTEM_CONFIG = {
   AVG_PALLET_WEIGHT: 1500, // pounds
-  TARGET_CAPACITY: (() => {
-    // Try to load from localStorage, fallback to default
-    try {
-      const saved = localStorage.getItem('targetCapacity');
-      return saved ? parseInt(saved, 10) : 900000;
-    } catch (error) {
-      console.error('Error loading target capacity from localStorage:', error);
-      return 900000; // 900,000 lbs default
-    }
-  })(),
+  TARGET_CAPACITY: 900000, // Default, will be set at runtime
   TOLERANCE_PERCENTAGE: 2,
   WEEKLY_TARGET: 715000 // pounds
 };
 
-export const updateTargetCapacity = (newCapacity) => {
+export const setTargetCapacity = (newCapacity) => {
   SYSTEM_CONFIG.TARGET_CAPACITY = newCapacity;
-  // Persist to localStorage
-  try {
-    localStorage.setItem('targetCapacity', newCapacity.toString());
-  } catch (error) {
-    console.error('Error saving target capacity to localStorage:', error);
+};
+
+export const updateTargetCapacity = async (newCapacity, persistCallback) => {
+  setTargetCapacity(newCapacity);
+  if (persistCallback) {
+    await persistCallback(newCapacity);
   }
 };
 

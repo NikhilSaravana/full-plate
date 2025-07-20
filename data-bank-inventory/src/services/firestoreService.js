@@ -332,6 +332,18 @@ class FirestoreService {
     }
   }
 
+  async setTargetCapacity(userId, targetCapacity) {
+    return this.saveUserPreferences(userId, { targetCapacity });
+  }
+
+  async getTargetCapacity(userId) {
+    const prefs = await this.getUserPreferences(userId);
+    if (prefs.success && prefs.data && prefs.data.targetCapacity) {
+      return prefs.data.targetCapacity;
+    }
+    return 900000; // Default fallback
+  }
+
   // Activity operations
   async addActivity(userId, activityData) {
     try {
