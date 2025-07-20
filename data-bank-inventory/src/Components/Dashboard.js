@@ -179,7 +179,9 @@ const Dashboard = () => {
                  data.every(item => item.timestamp && item.message);
         case 'distributions':
           return Array.isArray(data) && 
-                 data.every(item => item.totalDistributed && item.date);
+                 data.every(item => item && typeof item === 'object' && 
+                 (item.totalDistributed !== undefined || item.totalDistributed === 0) && 
+                 item.date);
         default:
           return true;
       }
@@ -199,12 +201,7 @@ const Dashboard = () => {
         safeLocalStorageSet('foodBankActivity', trimmedActivity);
       }
 
-      // Remove old distribution entries (keep only last 100)
-      const distributions = safeLocalStorageGet('distributionHistory', []);
-      if (distributions.length > 100) {
-        const trimmedDistributions = distributions.slice(0, 100);
-        safeLocalStorageSet('distributionHistory', trimmedDistributions);
-      }
+      // Remove old distribution entries (keep only last 100) - REMOVED: This is now handled by the new system
 
       console.log('Old data cleaned up to free storage space');
     } catch (error) {
@@ -251,16 +248,10 @@ const Dashboard = () => {
   // Enhanced data loading with validation
   useEffect(() => {
     if (!currentUser) return;
-    // Clear all non-namespaced keys on login
-    Object.keys(localStorage).forEach(key => {
-      if (!key.endsWith(`_${currentUser.uid}`)) {
-        localStorage.removeItem(key);
-      }
-    });
+    // No longer clearing localStorage keys - using proper namespacing instead
     try {
       const savedInventory = safeLocalStorageGet('foodBankInventory');
       const savedActivity = safeLocalStorageGet('foodBankActivity', []);
-      const savedDistributions = safeLocalStorageGet('distributionHistory', []);
       const hasBeenSetup = safeLocalStorageGet('foodBankSetupComplete');
       // Validate and load inventory
       if (savedInventory && validateData(savedInventory, 'inventory')) {
@@ -270,10 +261,7 @@ const Dashboard = () => {
       if (validateData(savedActivity, 'activity')) {
         setRecentActivity(savedActivity);
       }
-      // Validate and load distributions
-      if (validateData(savedDistributions, 'distributions')) {
-        setDistributionHistory(savedDistributions);
-      }
+      // Distribution loading is now handled by the separate useEffect below
       if (hasBeenSetup) {
         setIsFirstTime(false);
       }
@@ -312,12 +300,6 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!currentUser) return;
-    safeLocalStorageSet('distributionHistory', distributionHistory);
-    // updateOutgoingMetrics(); // This is now handled by the new useEffect
-  }, [distributionHistory, currentUser]);
-
-  useEffect(() => {
-    if (!currentUser) return;
     safeLocalStorageSet('orderingUnit', orderingUnit);
     // Only explicit saves allowed
   }, [orderingUnit, currentUser]);
@@ -338,25 +320,7 @@ const Dashboard = () => {
     return () => clearTimeout(timer);
   }, [currentUser]);
 
-  // --- Load distributionHistory from Firestore on login ---
-  useEffect(() => {
-    if (currentUser && connectionStatus.connected) {
-      firestoreService.getUserDistributions(currentUser.uid, 1000)
-        .then(data => {
-          if (Array.isArray(data)) {
-            setDistributionHistory(data);
-          } else if (Array.isArray(data?.data)) {
-            setDistributionHistory(data.data);
-          } else {
-            setDistributionHistory([]);
-          }
-        })
-        .catch(error => {
-          console.error('Error loading distribution history from Firestore:', error);
-          setDistributionHistory([]);
-        });
-    }
-  }, [currentUser, connectionStatus.connected]);
+  // --- Load distributionHistory from Firestore on login --- REMOVED: This is now handled by the new system above
 
   // --- Calculate outgoingMetrics from distributionHistory ---
   useEffect(() => {
@@ -647,6 +611,73 @@ System Health Check:
     return healthReport;
   };
 
+  // --- Distribution Data Management ---
+  // Robust validation for distributions
+  const validateDistributions = (data) => {
+    return Array.isArray(data) && data.every(item =>
+      item && typeof item === 'object' &&
+      typeof item.date === 'string' &&
+      typeof item.totalDistributed === 'number'
+    );
+  };
+
+  // Helper to get namespaced key
+  const getDistributionHistoryKey = () => currentUser ? `distributionHistory_${currentUser.uid}` : 'distributionHistory';
+
+  // Load distributionHistory from localStorage on mount/login
+  const [isLoadingDistributions, setIsLoadingDistributions] = useState(true);
+  
+  useEffect(() => {
+    if (!currentUser) return;
+    const key = getDistributionHistoryKey();
+    const savedDistributions = safeLocalStorageGet(key, []);
+    console.log('[LOAD] distributionHistory from localStorage:', savedDistributions);
+    if (validateDistributions(savedDistributions)) {
+      setDistributionHistory(savedDistributions);
+      console.log('[LOAD] distributionHistory loaded:', savedDistributions.length, 'records');
+    } else {
+      setDistributionHistory([]);
+      console.log('[LOAD] distributionHistory invalid, reset to empty');
+    }
+    setIsLoadingDistributions(false);
+  }, [currentUser]);
+
+  // Save distributionHistory to localStorage whenever it changes
+  useEffect(() => {
+    if (!currentUser || isLoadingDistributions) return;
+    const key = getDistributionHistoryKey();
+    safeLocalStorageSet(key, distributionHistory);
+    console.log('[SAVE] distributionHistory to localStorage:', distributionHistory.length, 'records');
+  }, [distributionHistory, currentUser, isLoadingDistributions]);
+
+  // On login, load from Firestore, but only overwrite if Firestore has data
+  useEffect(() => {
+    if (currentUser && connectionStatus.connected) {
+      firestoreService.getUserDistributions(currentUser.uid, 1000)
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            setDistributionHistory(data);
+            const key = getDistributionHistoryKey();
+            safeLocalStorageSet(key, data);
+            console.log('[FIRESTORE] Loaded and saved to localStorage:', data.length, 'records');
+          } else if (Array.isArray(data?.data) && data.data.length > 0) {
+            setDistributionHistory(data.data);
+            const key = getDistributionHistoryKey();
+            safeLocalStorageSet(key, data.data);
+            console.log('[FIRESTORE] Loaded and saved to localStorage:', data.data.length, 'records');
+          } else {
+            // Do not overwrite local data if Firestore is empty
+            console.log('[FIRESTORE] No distribution data in Firestore, keeping local data');
+          }
+        })
+        .catch(error => {
+          console.error('Error loading distribution history from Firestore:', error);
+          // Do not clear local data on error
+        });
+    }
+  }, [currentUser, connectionStatus.connected]);
+
+  // When a distribution is submitted, always update state and localStorage
   const handleSurveySubmit = async (surveyData) => {
     console.log('Survey data received:', surveyData);
     
@@ -700,12 +731,16 @@ System Health Check:
         notes: surveyData.notes || '',
         timestamp: new Date().toISOString()
       };
-
-      // Add to local distribution history
-      setDistributionHistory(prev => [distributionRecord, ...prev]);
+      setDistributionHistory(prev => {
+        const updated = [distributionRecord, ...prev];
+        const key = getDistributionHistoryKey();
+        safeLocalStorageSet(key, updated);
+        console.log('[SUBMIT] distribution saved:', distributionRecord);
+        return updated;
+      });
 
       // Save to cloud if connected
-      if (currentUser && !connectionStatus.connected) {
+      if (currentUser && connectionStatus.connected) {
         try {
           const cloudId = await firestoreService.saveDistribution(currentUser.uid, distributionRecord);
           if (cloudId) {
@@ -1455,10 +1490,21 @@ System Health Check:
                       </div>
                       
                       <div className="analytics-card">
-                        <h3>Nutritional Quality</h3>
-                        <div className="nutrition-score">
-                          <div className="score-circle">
-                            <span className="score-value">{getNutritionalScore()}</span>
+                        <div className="tooltip-wrapper">
+                          <h3>Nutritional Quality</h3>
+                          <div className="nutrition-score">
+                            <div className="score-circle">
+                              <span className="score-value">{getNutritionalScore()}</span>
+                            </div>
+                          </div>
+                          <div className="tooltip">
+                            <strong>Nutritional Quality</strong><br/>
+                            This measures the percentage of nutritious foods (Vegetables, Fruits, Produce, and Protein) in your total inventory.<br/><br/>
+                            <strong>Calculation:</strong> (Nutritious Foods Weight / Total Inventory Weight) × 100<br/><br/>
+                            <strong>Ideal Range:</strong> 60-80%<br/>
+                            • 60%+ = Good nutritional balance<br/>
+                            • 70%+ = Excellent nutritional quality<br/>
+                            • Below 50% = Consider increasing nutritious food donations
                           </div>
                         </div>
                       </div>
