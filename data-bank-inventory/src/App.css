@@ -156,6 +156,7 @@
   grid-template-columns: 2fr 1fr;
   gap: 30px;
   margin-bottom: 30px;
+  align-items: stretch;
 }
 
 .overview-section {
@@ -164,6 +165,10 @@
   padding: 25px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   border: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+  min-height: 600px;
 }
 
 .overview-section h2 {
@@ -2888,8 +2893,11 @@
 
 /* Critical Alerts Styles */
 .alerts-feed {
-  max-height: 400px;
+  max-height: none;
+  height: calc(100% - 60px); /* Account for the h2 header */
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .no-alerts {
@@ -2899,6 +2907,11 @@
   background: #f8fff9;
   border-radius: 8px;
   border: 1px solid #d4edda;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .no-alerts p {
@@ -2913,6 +2926,72 @@
   border-radius: 8px;
   border-left: 4px solid;
   background: white;
+  flex-shrink: 0;
+}
+
+.alert-item:last-child {
+  margin-bottom: 0;
+}
+
+.alert-item.critical {
+  border-left-color: #dc3545;
+  background: #fff5f5;
+}
+
+.alert-item.warning {
+  border-left-color: #ffc107;
+  background: #fffbf0;
+}
+
+.alert-item.info {
+  border-left-color: #17a2b8;
+  background: #f0fbff;
+}
+
+.alert-icon {
+  font-size: 1.2em;
+  margin-right: 12px;
+  margin-top: 2px;
+}
+
+.alert-content {
+  flex: 1;
+}
+
+.alert-message {
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: #212529;
+}
+
+.alert-action {
+  font-size: 0.9em;
+  color: #6c757d;
+  margin: 0;
+}
+
+.alert-priority {
+  font-size: 0.75em;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.alert-priority.high {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.alert-priority.medium {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.alert-priority.low {
+  background: #d1ecf1;
+  color: #0c5460;
 }
 
 .alert-item.critical {
@@ -3115,6 +3194,15 @@
   .alert-priority {
     margin-top: 8px;
     align-self: flex-start;
+  }
+  
+  .alerts-feed {
+    height: auto;
+    max-height: 300px;
+  }
+  
+  .overview-section {
+    min-height: auto;
   }
 }
 
