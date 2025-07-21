@@ -4,7 +4,8 @@ import {
   createUserWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth } from '../firebase/config';
 
@@ -50,6 +51,17 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Password reset function
+  async function resetPassword(email) {
+    try {
+      setError('');
+      return await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      setError(error.message);
+      throw error;
+    }
+  }
+
   // Logout function
   function logout() {
     localStorage.clear(); // Clear all localStorage data on logout
@@ -82,6 +94,7 @@ export function AuthProvider({ children }) {
     login,
     signup,
     logout,
+    resetPassword,
     updateUserProfile,
     error,
     setError

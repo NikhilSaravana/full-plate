@@ -100,6 +100,9 @@ const Login = () => {
               required
               placeholder="Enter your password"
             />
+            <div className="forgot-password-link">
+              <Link to="/forgot-password">Forgot Password?</Link>
+            </div>
           </div>
           
           <button 

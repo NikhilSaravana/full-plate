@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Dashboard from './Components/Dashboard';
 import Login from './Components/Auth/Login';
 import Register from './Components/Auth/Register';
+import ForgotPassword from './Components/Auth/ForgotPassword';
 import './App.css';
 
 // Protected Route wrapper
@@ -12,10 +13,10 @@ function ProtectedRoute({ children }) {
   return currentUser ? children : <Navigate to="/login" />;
 }
 
-// Public Route wrapper (redirect to dashboard if already logged in)
+// Public Route wrapper (redirects to dashboard if already logged in)
 function PublicRoute({ children }) {
   const { currentUser } = useAuth();
-  return !currentUser ? children : <Navigate to="/" />;
+  return currentUser ? <Navigate to="/" /> : children;
 }
 
 function AppRoutes() {
@@ -35,6 +36,14 @@ function AppRoutes() {
           element={
             <PublicRoute>
               <Register />
+            </PublicRoute>
+          } 
+        />
+        <Route 
+          path="/forgot-password" 
+          element={
+            <PublicRoute>
+              <ForgotPassword />
             </PublicRoute>
           } 
         />
