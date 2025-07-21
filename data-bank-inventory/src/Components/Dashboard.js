@@ -11,6 +11,7 @@ import { UnitConverters } from './UnitConfiguration';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getCombinedAlerts } from './alertUtils';
 import { SYSTEM_CONFIG, setTargetCapacity } from './FoodCategoryMapper';
+import { getCategoryStatus, MYPLATE_GOALS } from './FoodCategoryMapper';
 
 // Default unit configurations for inventory units
 const DEFAULT_UNIT_CONFIGS = {
@@ -123,6 +124,29 @@ const Dashboard = () => {
 
   // Helper to get today's date string
   const getTodayString = () => new Date().toISOString().split('T')[0];
+
+  // Manual reset function for today's metrics
+  const resetTodayMetrics = () => {
+    setOutgoingMetrics(prev => ({
+      ...prev,
+      totalDistributedToday: 0,
+      clientsServedToday: 0
+    }));
+    console.log('Manual reset: Today\'s metrics reset to zero');
+    showAutoSaveStatus('Today\'s metrics reset to zero', false);
+  };
+
+  // Test function to simulate midnight reset (for debugging)
+  const testMidnightReset = () => {
+    console.log('Testing midnight reset...');
+    // Clear the last calculated date to force recalculation
+    localStorage.removeItem(nsKey('lastCalculatedDate'));
+    // Reset today's metrics
+    resetTodayMetrics();
+    // Force recalculation
+    setDistributionHistory(d => [...d]);
+    showAutoSaveStatus('Midnight reset test completed', false);
+  };
 
   // Load today's metrics from Firestore on login
   useEffect(() => {
@@ -338,7 +362,7 @@ const Dashboard = () => {
     if (!currentUser) return;
     const now = new Date();
     const todayString = now.toISOString().split('T')[0];
-    // Start of today (local)
+    // Start of today (local time)
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     // Start of week (local, Sunday)
     const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
@@ -349,25 +373,47 @@ const Dashboard = () => {
       if (dist.createdAt && dist.createdAt.toDate) distDate = dist.createdAt.toDate();
       else if (dist.createdAt && typeof dist.createdAt === 'string') distDate = new Date(dist.createdAt);
       else if (dist.timestamp) distDate = new Date(dist.timestamp);
-      else if (dist.date) distDate = new Date(dist.date);
-      if (!distDate) return false;
-      return distDate >= startOfToday && distDate < new Date(startOfToday.getTime() + 24*60*60*1000);
+      else if (dist.date) {
+        // Handle date string in YYYY-MM-DD format
+        if (typeof dist.date === 'string' && dist.date.includes('-')) {
+          distDate = new Date(dist.date + 'T00:00:00');
+        } else {
+          distDate = new Date(dist.date);
+        }
+      }
+      if (!distDate || isNaN(distDate.getTime())) return false;
+      
+      // Compare with today's date range (local time)
+      const distDateString = distDate.toISOString().split('T')[0];
+      return distDateString === todayString;
     });
+    
     const weekDistributions = distributionHistory.filter(dist => {
       let distDate = null;
       if (dist.createdAt && dist.createdAt.toDate) distDate = dist.createdAt.toDate();
       else if (dist.createdAt && typeof dist.createdAt === 'string') distDate = new Date(dist.createdAt);
       else if (dist.timestamp) distDate = new Date(dist.timestamp);
-      else if (dist.date) distDate = new Date(dist.date);
-      if (!distDate) return false;
+      else if (dist.date) {
+        // Handle date string in YYYY-MM-DD format
+        if (typeof dist.date === 'string' && dist.date.includes('-')) {
+          distDate = new Date(dist.date + 'T00:00:00');
+        } else {
+          distDate = new Date(dist.date);
+        }
+      }
+      if (!distDate || isNaN(distDate.getTime())) return false;
       return distDate >= startOfWeek && distDate <= now;
     });
+    
     const totalToday = todaysDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
     const totalWeek = weekDistributions.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0);
     const clientsToday = todaysDistributions.reduce((sum, dist) => sum + (dist.clientsServed || 0), 0);
     const avgSize = distributionHistory.length > 0
       ? distributionHistory.reduce((sum, dist) => sum + (dist.totalDistributed || 0), 0) / distributionHistory.length
       : 0;
+    
+    console.log(`Today's metrics calculation: ${todaysDistributions.length} distributions, ${totalToday} lbs, ${clientsToday} clients`);
+    
     setOutgoingMetrics(prev => ({
       ...prev,
       totalDistributedToday: totalToday,
@@ -385,11 +431,47 @@ const Dashboard = () => {
     const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const msToMidnight = nextMidnight - now;
     const timer = setTimeout(() => {
+      // Explicitly reset today's metrics to zero at midnight
+      setOutgoingMetrics(prev => ({
+        ...prev,
+        totalDistributedToday: 0,
+        clientsServedToday: 0
+      }));
+      console.log('Midnight reset: Today\'s metrics reset to zero');
+      
       // Force recalculation by updating distributionHistory (trigger useEffect above)
       setDistributionHistory(d => [...d]);
     }, msToMidnight);
     return () => clearTimeout(timer);
   }, [currentUser, distributionHistory]);
+
+  // --- Daily Date Check ---
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    // Check if the date has changed since last calculation
+    const today = new Date().toISOString().split('T')[0];
+    const lastCalculatedDate = localStorage.getItem(nsKey('lastCalculatedDate'));
+    
+    if (lastCalculatedDate !== today) {
+      console.log('Date changed from', lastCalculatedDate, 'to', today, '- recalculating metrics');
+      
+      // Update the last calculated date
+      localStorage.setItem(nsKey('lastCalculatedDate'), today);
+      
+      // Force recalculation of today's metrics
+      setDistributionHistory(d => [...d]);
+    }
+  }, [currentUser]);
+
+  // Debug: Log current date and reset status
+  useEffect(() => {
+    if (!currentUser) return;
+    const today = new Date().toISOString().split('T')[0];
+    const lastCalculatedDate = localStorage.getItem(nsKey('lastCalculatedDate'));
+    console.log(`[DEBUG] Current date: ${today}, Last calculated: ${lastCalculatedDate || 'never'}`);
+    console.log(`[DEBUG] Today's metrics: ${outgoingMetrics.totalDistributedToday} lbs, ${outgoingMetrics.clientsServedToday} clients`);
+  }, [currentUser, outgoingMetrics.totalDistributedToday, outgoingMetrics.clientsServedToday]);
 
   // --- Load distributionHistory from Firestore on login or reload ---
   const reloadDistributionHistoryFromFirestore = async () => {
@@ -1069,6 +1151,13 @@ System Health Check:
     return getTime(b) - getTime(a);
   };
 
+  // Helper to parse date string as local date (not UTC)
+  const parseLocalDate = (dateString) => {
+    if (!dateString) return new Date();
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day); // month is 0-indexed
+  };
+
   return (
     <>
       {/* Removed: Reload Distributions from Firestore button */}
@@ -1204,6 +1293,20 @@ System Health Check:
             </button>
               <div className="tooltip">System Health Check</div>
             </div>
+            <div className="tooltip-wrapper">
+              <button onClick={resetTodayMetrics} className="btn btn-warning" style={{ minWidth: 'auto', padding: '8px 12px' }}>
+                Reset Today
+              </button>
+              <div className="tooltip">Reset Today's Metrics</div>
+            </div>
+            {process.env.NODE_ENV === 'development' && (
+              <div className="tooltip-wrapper">
+                <button onClick={testMidnightReset} className="btn btn-secondary" style={{ minWidth: 'auto', padding: '8px 12px' }}>
+                  Test Reset
+                </button>
+                <div className="tooltip">Test Midnight Reset (Dev Only)</div>
+              </div>
+            )}
             <div className="tooltip-wrapper">
               <button onClick={resetAllData} className="btn btn-danger" style={{ minWidth: 'auto', padding: '8px 12px' }}>
                 Reset
@@ -1373,8 +1476,10 @@ System Health Check:
                       {Object.entries(currentInventory).map(([category, weight]) => {
                         const total = getTotalInventory();
                         const percentage = total > 0 ? ((weight / total) * 100).toFixed(1) : '0.0';
-                        const isOverTarget = parseFloat(percentage) > 20;
-                        const isUnderTarget = parseFloat(percentage) < 5 && total > 0;
+                        const goalPercentage = MYPLATE_GOALS[category]?.percentage || 0;
+                        const status = getCategoryStatus(parseFloat(percentage), goalPercentage);
+                        const isOverTarget = status === 'OVER';
+                        const isUnderTarget = status === 'UNDER';
                         
                         return (
                           <div key={category} className={`category-card ${isOverTarget ? 'over-target' : isUnderTarget ? 'under-target' : ''}`}>
@@ -1382,9 +1487,7 @@ System Health Check:
                                 <p className="weight">{formatInventoryValue(weight, category)}</p>
                             <p className="percentage">{percentage}%</p>
                             <div className="category-status">
-                              {isOverTarget && <span className="status-badge over">OVER</span>}
-                              {isUnderTarget && <span className="status-badge under">UNDER</span>}
-                              {!isOverTarget && !isUnderTarget && <span className="status-badge okay">OKAY</span>}
+                              <span className={`status-badge ${status.toLowerCase()}`}>{status}</span>
                             </div>
                                 {orderingUnit !== 'pounds' && (
                                   <p className="weight-conversion">
@@ -1469,7 +1572,7 @@ System Health Check:
                                       {distribution.totalDistributed?.toFixed(1)} lbs to {distribution.recipient}
                                     </p>
                                     <p className="distribution-details">
-                                      {distribution.clientsServed} clients • {new Date(distribution.date).toLocaleDateString()}
+                                      {distribution.clientsServed} clients • {parseLocalDate(distribution.date).toLocaleDateString()}
                                     </p>
                                   </div>
                                   <div className="distribution-weight">
@@ -1605,7 +1708,7 @@ System Health Check:
                           {distributionHistory.slice().sort(sortDistributionsByRecency).slice(0, 20).map((distribution, index) => (
                             <div key={index} className="distribution-row">
                               <div className="distribution-date">
-                                {new Date(distribution.date).toLocaleDateString()}
+                                {parseLocalDate(distribution.date).toLocaleDateString()}
                               </div>
                               <div className="distribution-recipient">
                                 {distribution.recipient}

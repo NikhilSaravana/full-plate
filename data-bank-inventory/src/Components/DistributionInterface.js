@@ -5,7 +5,7 @@ import ConfirmationDialog from './ConfirmationDialog';
 
 const DistributionInterface = ({ onDataSubmit }) => {
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
     recipient: '',
     notes: ''
   });
@@ -109,7 +109,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
     // Reset form
     setItems([{ foodType: '', quantity: '', unit: 'POUND', notes: '' }]);
     setFormData({
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
       recipient: '',
       notes: ''
     });

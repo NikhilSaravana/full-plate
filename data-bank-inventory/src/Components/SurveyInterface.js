@@ -6,7 +6,7 @@ import ConfirmationDialog from './ConfirmationDialog';
 const SurveyInterface = ({ onDataSubmit }) => {
   const [surveyMode, setSurveyMode] = useState('SINGLE'); // SINGLE, BULK, DISTRIBUTION
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
     source: 'Direct Donation',
     notes: ''
   });
@@ -128,7 +128,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
     // Reset form
     setItems([{ foodType: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }]);
     setFormData({
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
       source: 'Direct Donation',
       notes: ''
     });
