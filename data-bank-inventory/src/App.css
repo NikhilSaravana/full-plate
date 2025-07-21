@@ -3946,3 +3946,129 @@
     gap: 4px;
   }
 }
+
+/* Modern Form Field Styles (scoped to main forms) */
+.survey-form input[type="text"],
+.survey-form input[type="number"],
+.survey-form input[type="date"],
+.survey-form input[type="email"],
+.survey-form input[type="password"],
+.survey-form select,
+.survey-form textarea,
+.form-section input[type="text"],
+.form-section input[type="number"],
+.form-section input[type="date"],
+.form-section input[type="email"],
+.form-section input[type="password"],
+.form-section select,
+.form-section textarea,
+.add-item-form input[type="text"],
+.add-item-form input[type="number"],
+.add-item-form input[type="date"],
+.add-item-form select,
+.add-item-form textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 1em;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  background: #f8f9fa;
+  color: #2c3e50;
+  margin-bottom: 12px;
+}
+
+.survey-form input:focus,
+.survey-form select:focus,
+.survey-form textarea:focus,
+.form-section input:focus,
+.form-section select:focus,
+.form-section textarea:focus,
+.add-item-form input:focus,
+.add-item-form select:focus,
+.add-item-form textarea:focus {
+  outline: none;
+  border-color: #2c5aa0;
+  box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.08);
+  background: #fff;
+}
+
+.survey-form select,
+.form-section select,
+.add-item-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: #f8f9fa url("data:image/svg+xml;utf8,<svg fill='gray' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>") no-repeat right 12px center/18px 18px;
+  padding-right: 36px;
+}
+
+.survey-form textarea,
+.form-section textarea,
+.add-item-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Inventory Search/Filter Controls */
+.search-input {
+  padding: 8px 12px;
+  border: 1.5px solid #e9ecef;
+  border-radius: 6px;
+  font-size: 1em;
+  background: #fff;
+  color: #2c3e50;
+  margin-right: 8px;
+  width: 180px;
+  transition: border-color 0.2s;
+}
+.search-input:focus {
+  border-color: #2c5aa0;
+  outline: none;
+}
+
+.category-filter {
+  padding: 8px 12px;
+  border: 1.5px solid #e9ecef;
+  border-radius: 6px;
+  font-size: 1em;
+  background: #fff;
+  color: #2c3e50;
+  margin-left: 8px;
+  width: 160px;
+  transition: border-color 0.2s;
+}
+.category-filter:focus {
+  border-color: #2c5aa0;
+  outline: none;
+}
+
+.add-item-btn {
+  background: #2c5aa0;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-left: 12px;
+  box-shadow: 0 2px 4px rgba(44,90,160,0.08);
+}
+.add-item-btn:hover {
+  background: #1e3a72;
+}
+
+.inventory-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.search-filter {
+  display: flex;
+  align-items: center;
+}
