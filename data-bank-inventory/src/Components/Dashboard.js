@@ -1409,160 +1409,164 @@ System Health Check:
 
                   {/* Dashboard Section */}
                   {activeOverviewSection === 'dashboard' && (
-                <div className="overview-grid">
-                  <div className="overview-section">
-                        <div className="section-header">
-                    <h2>Current Inventory Distribution</h2>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm font-medium text-gray-700">Show in:</span>
-                            <div className="flex rounded-md shadow-sm">
-                              <button
-                                onClick={() => setOrderingUnit('POUND')}
-                                className={`px-3 py-1 text-sm font-medium rounded-l-md ${
-                                  orderingUnit === 'POUND'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }`}
-                              >
-                                Pounds
-                              </button>
-                              <button
-                                onClick={() => setOrderingUnit('CASE')}
-                                className={`px-3 py-1 text-sm font-medium ${
-                                  orderingUnit === 'CASE'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }`}
-                              >
-                                Cases
-                              </button>
-                              <button
-                                onClick={() => setOrderingUnit('PALLET')}
-                                className={`px-3 py-1 text-sm font-medium rounded-r-md ${
-                                  orderingUnit === 'PALLET'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                                }`}
-                              >
-                                Pallets
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                    {/* Pie Chart Section */}
-                    <div style={{ width: '100%', height: 320, margin: '32px 0' }}>
-                      <ResponsiveContainer>
-                        <PieChart>
-                          <Pie
-                            data={pieData}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={110}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
-                          >
-                            {pieData.map((entry) => (
-                              <Cell key={`cell-${entry.name}`} fill={CATEGORY_COLORS[entry.name] || '#343a40'} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => `${value.toLocaleString()} lbs`} />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    {/* End Pie Chart Section */}
-                    <div className="category-grid">
-                      {Object.entries(currentInventory).map(([category, weight]) => {
-                        const total = getTotalInventory();
-                        const percentage = total > 0 ? ((weight / total) * 100).toFixed(1) : '0.0';
-                        const goalPercentage = MYPLATE_GOALS[category]?.percentage || 0;
-                        const status = getCategoryStatus(parseFloat(percentage), goalPercentage);
-                        const isOverTarget = status === 'OVER';
-                        const isUnderTarget = status === 'UNDER';
-                        
-                        return (
-                          <div key={category} className={`category-card ${isOverTarget ? 'over-target' : isUnderTarget ? 'under-target' : ''}`}>
-                            <h4>{category}</h4>
-                                <p className="weight">{formatInventoryValue(weight, category)}</p>
-                            <p className="percentage">{percentage}%</p>
-                            <div className="category-status">
-                              <span className={`status-badge ${status.toLowerCase()}`}>{status}</span>
-                            </div>
-                                {orderingUnit !== 'pounds' && (
-                                  <p className="weight-conversion">
-                                    ({weight.toLocaleString()} lbs)
-                                  </p>
-                                )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="overview-section">
-                        <h2>Critical Alerts & Warnings</h2>
-                        <div className="alerts-feed">
-                          {combinedAlerts.length === 0 ? (
-                            <div className="no-alerts">
-                              <p>No critical alerts at this time</p>
-                              <p>All systems are operating within normal parameters.</p>
-                            </div>
-                          ) : (
-                            combinedAlerts.slice(0, 8).map((alert, index) => (
-                              <div key={index} className={`alert-item ${alert.type.toLowerCase()}`}> 
-                                <div className="alert-icon">
-                                  {alert.type}
-                                </div>
-                                <div className="alert-content">
-                                  <p className="alert-message">{alert.message}</p>
-                                  {alert.action && <p className="alert-action">{alert.action}</p>}
-                                </div>
-                                <div className={`alert-priority ${alert.priority}`}>{alert.priority.toUpperCase()}</div>
+                    <>
+                      <div className="overview-grid">
+                        <div className="overview-section">
+                          <div className="section-header">
+                            <h2>Current Inventory Distribution</h2>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm font-medium text-gray-700">Show in:</span>
+                              <div className="flex rounded-md shadow-sm">
+                                <button
+                                  onClick={() => setOrderingUnit('POUND')}
+                                  className={`px-3 py-1 text-sm font-medium rounded-l-md ${
+                                    orderingUnit === 'POUND'
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  Pounds
+                                </button>
+                                <button
+                                  onClick={() => setOrderingUnit('CASE')}
+                                  className={`px-3 py-1 text-sm font-medium ${
+                                    orderingUnit === 'CASE'
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  Cases
+                                </button>
+                                <button
+                                  onClick={() => setOrderingUnit('PALLET')}
+                                  className={`px-3 py-1 text-sm font-medium rounded-r-md ${
+                                    orderingUnit === 'PALLET'
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  Pallets
+                                </button>
                               </div>
-                            ))
-                          )}
+                            </div>
+                          </div>
+                          {/* Pie Chart Section */}
+                          <div style={{ width: '100%', height: 320, margin: '32px 0' }}>
+                            <ResponsiveContainer>
+                              <PieChart>
+                                <Pie
+                                  data={pieData}
+                                  dataKey="value"
+                                  nameKey="name"
+                                  cx="50%"
+                                  cy="50%"
+                                  outerRadius={110}
+                                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                                >
+                                  {pieData.map((entry) => (
+                                    <Cell key={`cell-${entry.name}`} fill={CATEGORY_COLORS[entry.name] || '#343a40'} />
+                                  ))}
+                                </Pie>
+                                <Tooltip formatter={(value) => `${value.toLocaleString()} lbs`} />
+                                <Legend />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          {/* End Pie Chart Section */}
+                          <div className="category-grid">
+                            {Object.entries(currentInventory).map(([category, weight]) => {
+                              const total = getTotalInventory();
+                              const percentage = total > 0 ? ((weight / total) * 100).toFixed(1) : '0.0';
+                              const goalPercentage = MYPLATE_GOALS[category]?.percentage || 0;
+                              const status = getCategoryStatus(parseFloat(percentage), goalPercentage);
+                              const isOverTarget = status === 'OVER';
+                              const isUnderTarget = status === 'UNDER';
+                              
+                              return (
+                                <div key={category} className={`category-card ${isOverTarget ? 'over-target' : isUnderTarget ? 'under-target' : ''}`}>
+                                  <h4>{category}</h4>
+                                  <p className="weight">{formatInventoryValue(weight, category)}</p>
+                                  <p className="percentage">{percentage}%</p>
+                                  <div className="category-status">
+                                    <span className={`status-badge ${status.toLowerCase()}`}>{status}</span>
+                                  </div>
+                                  {orderingUnit !== 'pounds' && (
+                                    <p className="weight-conversion">
+                                      ({weight.toLocaleString()} lbs)
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                  </div>
 
-                  <div className="overview-section">
-                    <h2>Quick Actions</h2>
-                    <div className="quick-actions">
-                      <button 
-                        className="btn btn-primary"
-                            onClick={() => setActiveTab('dataentry')}
-                      >
-                        Add Inventory
-                      </button>
-                      <button 
-                        className="btn btn-secondary"
-                        onClick={() => setActiveTab('myplate')}
-                      >
-                        Check MyPlate
-                      </button>
-                      <button 
-                        className="btn btn-secondary"
-                            onClick={() => setActiveOverviewSection('inventory')}
-                      >
-                            Manage Inventory
-                      </button>
-                      <button 
-                        className="btn btn-danger"
-                        onClick={resetAllData}
-                      >
-                        Reset All Data
-                      </button>
-                    </div>
-                  </div>
+                        <div className="overview-section">
+                          <h2>Critical Alerts & Warnings</h2>
+                          <div className="alerts-feed">
+                            {combinedAlerts.length === 0 ? (
+                              <div className="no-alerts">
+                                <p>No critical alerts at this time</p>
+                                <p>All systems are operating within normal parameters.</p>
+                              </div>
+                            ) : (
+                              combinedAlerts.slice(0, 8).map((alert, index) => (
+                                <div key={index} className={`alert-item ${alert.type.toLowerCase()}`}> 
+                                  <div className="alert-icon">
+                                    {alert.type}
+                                  </div>
+                                  <div className="alert-content">
+                                    <p className="alert-message">{alert.message}</p>
+                                    {alert.action && <p className="alert-action">{alert.action}</p>}
+                                  </div>
+                                  <div className={`alert-priority ${alert.priority}`}>{alert.priority.toUpperCase()}</div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
-                      <div className="overview-section">
-                        <h2>Recent Distributions</h2>
-                        <div className="distribution-feed">
-                          {distributionHistory.length === 0 ? (
-                            <div className="no-distributions">
-                              <p>No distributions recorded yet</p>
-                              <p>Start recording distributions to track outgoing food.</p>
-              </div>
+                      {/* Second row with Quick Actions and Recent Distributions */}
+                      <div className="overview-grid-compact" style={{ marginTop: '15px' }}>
+                        <div className="overview-section">
+                          <h2>Quick Actions</h2>
+                          <div className="quick-actions">
+                            <button 
+                              className="btn btn-primary"
+                              onClick={() => setActiveTab('dataentry')}
+                            >
+                              Add Inventory
+                            </button>
+                            <button 
+                              className="btn btn-secondary"
+                              onClick={() => setActiveTab('myplate')}
+                            >
+                              Check MyPlate
+                            </button>
+                            <button 
+                              className="btn btn-secondary"
+                              onClick={() => setActiveOverviewSection('inventory')}
+                            >
+                              Manage Inventory
+                            </button>
+                            <button 
+                              className="btn btn-danger"
+                              onClick={resetAllData}
+                            >
+                              Reset All Data
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="overview-section">
+                          <h2>Recent Distributions</h2>
+                          <div className="distribution-feed">
+                            {distributionHistory.length === 0 ? (
+                              <div className="no-distributions">
+                                <p>No distributions recorded yet</p>
+                                <p>Start recording distributions to track outgoing food.</p>
+                              </div>
                             ) : (
                               distributionHistory.slice().sort(sortDistributionsByRecency).slice(0, 5).map((distribution, index) => (
                                 <div key={index} className="distribution-item">
@@ -1580,20 +1584,21 @@ System Health Check:
                                   </div>
                                 </div>
                               ))
-            )}
-          </div>
-                      {distributionHistory.length > 5 && (
-                        <button 
-                          className="btn btn-secondary"
-                          onClick={() => setActiveOverviewSection('distributions')}
-                          style={{ marginTop: '16px' }}
-                        >
-                          View All Distributions
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
+                            )}
+                          </div>
+                          {distributionHistory.length > 5 && (
+                            <button 
+                              className="btn btn-secondary"
+                              onClick={() => setActiveOverviewSection('distributions')}
+                              style={{ marginTop: '16px' }}
+                            >
+                              View All Distributions
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                 {/* Inventory Management Section */}
                 {activeOverviewSection === 'inventory' && (

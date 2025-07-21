@@ -156,7 +156,15 @@
   grid-template-columns: 2fr 1fr;
   gap: 30px;
   margin-bottom: 30px;
-  align-items: stretch;
+  align-items: start;
+}
+
+.overview-grid-compact {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 30px;
+  margin-bottom: 30px;
+  align-items: start;
 }
 
 .overview-section {
@@ -168,14 +176,18 @@
   display: flex;
   flex-direction: column;
   height: fit-content;
-  min-height: 600px;
+  min-height: 200px;
 }
 
 .overview-section h2 {
-  margin: 0 0 20px 0;
+  margin: 0 0 15px 0;
   color: #2c5aa0;
   font-size: 1.6em;
   font-weight: 600;
+}
+
+.quick-actions-section {
+  min-height: 120px;
 }
 
 .category-grid {
@@ -2463,23 +2475,30 @@
 
 /* Quick Actions */
 .quick-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  margin: 0;
 }
 
 .action-btn {
-  padding: 15px 20px;
+  padding: 10px 14px;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 1em;
+  font-size: 0.85em;
   cursor: pointer;
   transition: all 0.2s ease;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 5px;
+  flex: 0 0 auto;
+  min-width: 110px;
+  max-width: 150px;
 }
 
 .action-btn.primary {
@@ -3204,12 +3223,38 @@
   .overview-section {
     min-height: auto;
   }
+  
+  .distribution-feed {
+    height: auto;
+    max-height: 300px;
+  }
+  
+  .quick-actions {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+  
+  .action-btn {
+    min-width: auto;
+    max-width: none;
+    width: 100%;
+    padding: 10px 12px;
+  }
+  
+  .distribution-feed {
+    min-height: 150px;
+  }
 }
 
 /* Distribution Tracking Styles */
 .distribution-feed {
-  max-height: 300px;
+  max-height: none;
+  height: auto;
+  min-height: 120px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .no-distributions {
@@ -3219,6 +3264,11 @@
   background: #f8f9fa;
   border-radius: 8px;
   border: 1px solid #e9ecef;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .no-distributions p {
@@ -3230,6 +3280,7 @@
   align-items: center;
   padding: 12px 0;
   border-bottom: 1px solid #f1f3f4;
+  flex-shrink: 0;
 }
 
 .distribution-item:last-child {
@@ -3357,11 +3408,12 @@
 }
 
 .distribution-row:first-child {
-  background: #2c5aa0;
-  color: white;
+  background: #f8f9fa;
+  color: #2c5aa0;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border: 2px solid #2c5aa0;
 }
 
 .distribution-date {
@@ -3389,6 +3441,16 @@
   text-align: center;
   color: #6c757d;
   font-size: 0.85em;
+}
+
+/* Override colors for header row */
+.distribution-row:first-child .distribution-date,
+.distribution-row:first-child .distribution-recipient,
+.distribution-row:first-child .distribution-amount,
+.distribution-row:first-child .distribution-clients,
+.distribution-row:first-child .distribution-categories {
+  color: #2c5aa0;
+  font-weight: 600;
 }
 
 /* Responsive adjustments */
