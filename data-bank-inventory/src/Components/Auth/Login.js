@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { isFirebaseConfigured } from '../../firebase/config';
+import FoodBackground from './FoodBackground';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -63,8 +64,9 @@ const Login = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
+    <div className="auth-container" style={{ position: 'relative', minHeight: '100vh', overflow: 'hidden' }}>
+      <FoodBackground count={18} />
+      <div className="auth-card" style={{ background: 'rgba(255,255,255,0.92)', zIndex: 2, position: 'relative' }}>
         <div className="auth-header">
           <h2>Food Bank Inventory</h2>
           <p>Sign in to your account</p>
