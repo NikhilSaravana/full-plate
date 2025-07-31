@@ -124,14 +124,14 @@ export const FOOD_CATEGORY_MAPPING = {
 
 // MyPlate Goals Configuration
 export const MYPLATE_GOALS = {
-  VEG: { percentage: 15, palletTarget: 90 },
-  FRUIT: { percentage: 15, palletTarget: 90 },
-  DAIRY: { percentage: 3, palletTarget: 18 },
-  GRAIN: { percentage: 15, palletTarget: 90 },
-  PROTEIN: { percentage: 20, palletTarget: 120 },
-  MISC: { percentage: 12, palletTarget: 72 },
-  PRODUCE: { percentage: 20, palletTarget: 120 },
-  OTHER: { percentage: 0, palletTarget: 0 }
+  VEG: { percentage: 15 },
+  FRUIT: { percentage: 15 },
+  DAIRY: { percentage: 3 },
+  GRAIN: { percentage: 15 },
+  PROTEIN: { percentage: 20 },
+  MISC: { percentage: 12 },
+  PRODUCE: { percentage: 20 },
+  OTHER: { percentage: 0 }
 };
 
 // System Configuration

@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { MYPLATE_GOALS, SYSTEM_CONFIG, getCategoryStatus, getMyPlateCategory, updateTargetCapacity } from './FoodCategoryMapper';
+import { UnitConverters } from './UnitConfiguration';
 
 const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTargetCapacity }) => {
   const [calculations, setCalculations] = useState({});
   const [summary, setSummary] = useState({});
   const [isEditingCapacity, setIsEditingCapacity] = useState(false);
   const [newCapacity, setNewCapacity] = useState(targetCapacity);
+  const [displayUnit, setDisplayUnit] = useState('POUNDS'); // POUNDS, CASES, PALLETS
 
   useEffect(() => {
     calculateMyPlateBalance();
     // eslint-disable-next-line
-  }, [currentInventory, targetCapacity, isEditingCapacity]);
+  }, [currentInventory, targetCapacity, isEditingCapacity, displayUnit]);
 
   // Update newCapacity when targetCapacity changes
   useEffect(() => {
@@ -36,6 +38,32 @@ const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTarg
     if (!isNaN(value) && value >= 0) {
       setNewCapacity(Number(value));
     }
+  };
+
+  // Helper function to format values based on display unit
+  const formatValue = (valueInPounds, category) => {
+    if (displayUnit === 'POUNDS') {
+      return `${valueInPounds.toLocaleString()} lbs`;
+    } else if (displayUnit === 'CASES') {
+      const cases = UnitConverters.convertFromStandardWeight(valueInPounds, 'CASE', category);
+      return `${cases < 1 ? cases.toFixed(3) : cases.toFixed(1)} cases`;
+    } else if (displayUnit === 'PALLETS') {
+      const pallets = UnitConverters.convertFromStandardWeight(valueInPounds, 'PALLET', category);
+      return `${pallets < 1 ? pallets.toFixed(3) : pallets.toFixed(2)} pallets`;
+    }
+    return `${valueInPounds.toLocaleString()} lbs`;
+  };
+
+  // Helper function to get numeric value for calculations
+  const getNumericValue = (valueInPounds, category) => {
+    if (displayUnit === 'POUNDS') {
+      return valueInPounds;
+    } else if (displayUnit === 'CASES') {
+      return UnitConverters.convertFromStandardWeight(valueInPounds, 'CASE', category);
+    } else if (displayUnit === 'PALLETS') {
+      return UnitConverters.convertFromStandardWeight(valueInPounds, 'PALLET', category);
+    }
+    return valueInPounds;
   };
 
   const calculateMyPlateBalance = () => {
@@ -80,13 +108,13 @@ const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTarg
       
       console.log(`${category}: Current=${currentWeight}lbs (${currentPercentage}%), Goal=${goalPercentage}%, Status=${status}`);
       
-      // Calculate target weights
+      // Calculate target weights based on target capacity
       const targetWeight = (goalPercentage / 100) * targetCapacity;
       const needToOrder = Math.max(0, targetWeight - currentWeight);
       
-      // Calculate pallets
+      // Calculate pallets dynamically based on target capacity
+      const targetPallets = (goalPercentage / 100) * targetCapacity / SYSTEM_CONFIG.AVG_PALLET_WEIGHT;
       const currentPallets = currentWeight / SYSTEM_CONFIG.AVG_PALLET_WEIGHT;
-      const targetPallets = goals.palletTarget;
       const palletDeficit = Math.max(0, targetPallets - currentPallets);
 
       categoryStats[category] = {
@@ -97,7 +125,7 @@ const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTarg
         targetWeight,
         needToOrder,
         currentPallets: currentPallets.toFixed(1),
-        targetPallets,
+        targetPallets: targetPallets.toFixed(1),
         palletDeficit: palletDeficit.toFixed(1),
         balanced: status === 'OKAY' ? 'OKAY' : 'NEEDS ADJUSTMENT'
       };
@@ -116,13 +144,38 @@ const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTarg
     <div className="myplate-calculator">
       <h2>MyPlate Balance Calculator</h2>
       
+      {/* Unit Toggle */}
+      <div className="unit-toggle-section">
+        <h3>Display Units</h3>
+        <div className="unit-toggle">
+          <button
+            className={`unit-btn ${displayUnit === 'POUNDS' ? 'active' : ''}`}
+            onClick={() => setDisplayUnit('POUNDS')}
+          >
+            Pounds
+          </button>
+          <button
+            className={`unit-btn ${displayUnit === 'CASES' ? 'active' : ''}`}
+            onClick={() => setDisplayUnit('CASES')}
+          >
+            Cases
+          </button>
+          <button
+            className={`unit-btn ${displayUnit === 'PALLETS' ? 'active' : ''}`}
+            onClick={() => setDisplayUnit('PALLETS')}
+          >
+            Pallets
+          </button>
+        </div>
+      </div>
+      
       {/* Summary Section */}
       <div className="summary-section">
         <h3>Current Status</h3>
         <div className="summary-stats">
           <div className="stat-item">
             <label>Total Current Inventory:</label>
-            <span>{summary.totalCurrent?.toLocaleString()} lbs</span>
+            <span>{formatValue(summary.totalCurrent || 0, 'MISC')}</span>
           </div>
           <div className="stat-item target-capacity">
             <label>Target Capacity:</label>
@@ -139,7 +192,7 @@ const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTarg
               </div>
             ) : (
               <div className="capacity-display">
-                <span>{targetCapacity?.toLocaleString()} lbs</span>
+                <span>{formatValue(targetCapacity || 0, 'MISC')}</span>
                 <button onClick={handleCapacityEdit} className="edit-btn">Edit</button>
               </div>
             )}
@@ -150,7 +203,7 @@ const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTarg
           </div>
           <div className="stat-item">
             <label>Total Need to Order:</label>
-            <span>{summary.totalNeedToOrder?.toLocaleString()} lbs</span>
+            <span>{formatValue(summary.totalNeedToOrder || 0, 'MISC')}</span>
           </div>
         </div>
       </div>
@@ -162,32 +215,26 @@ const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTarg
           <thead>
             <tr>
               <th>MyPlate Category</th>
-              <th>Current (lbs)</th>
+              <th>Current</th>
               <th>Current %</th>
               <th>Goal %</th>
               <th>Status</th>
-              <th>Target Weight</th>
+              <th>Target</th>
               <th>Need to Order</th>
-              <th>Current Pallets</th>
-              <th>Target Pallets</th>
-              <th>Pallet Deficit</th>
             </tr>
           </thead>
           <tbody>
             {Object.entries(calculations).map(([category, stats]) => (
               <tr key={category} className={`status-${stats.status.toLowerCase()}`}>
                 <td>{category}</td>
-                <td>{stats.currentWeight?.toLocaleString()}</td>
+                <td>{formatValue(stats.currentWeight, category)}</td>
                 <td>{stats.currentPercentage}%</td>
                 <td>{stats.goalPercentage}%</td>
                 <td className={`status-badge ${stats.status.toLowerCase()}`}>
                   {stats.status}
                 </td>
-                <td>{stats.targetWeight?.toLocaleString()}</td>
-                <td>{stats.needToOrder?.toLocaleString()}</td>
-                <td>{stats.currentPallets}</td>
-                <td>{stats.targetPallets}</td>
-                <td>{stats.palletDeficit}</td>
+                <td>{formatValue(stats.targetWeight, category)}</td>
+                <td>{formatValue(stats.needToOrder, category)}</td>
               </tr>
             ))}
           </tbody>
