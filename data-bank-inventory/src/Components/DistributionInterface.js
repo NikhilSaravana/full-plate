@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { FOOD_CATEGORY_MAPPING, getMyPlateCategory } from './FoodCategoryMapper';
-import { UnitConverters } from './UnitConfiguration';
+import { getUnitConverters } from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
 
-const DistributionInterface = ({ onDataSubmit }) => {
+const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
     recipient: '',
@@ -19,7 +19,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
   const [confirmationConfig, setConfirmationConfig] = useState({});
   const [emptyItemIndices, setEmptyItemIndices] = useState([]);
 
-  const availableUnits = UnitConverters.getAvailableUnits();
+  const unitConverters = getUnitConverters(unitConfig);
 
   const addItem = () => {
     setItems([...items, { foodType: '', quantity: '', unit: 'POUND', notes: '' }]);
@@ -38,7 +38,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
   const getWeightInPounds = (quantity, unit, category = null) => {
     if (!quantity || !unit) return 0;
     if (unit === 'POUNDS') return parseFloat(quantity);
-    return UnitConverters.convertToStandardWeight(parseFloat(quantity), unit, category);
+    return unitConverters.convertToStandardWeight(parseFloat(quantity), unit, category);
   };
 
   const calculateTotalWeight = () => {
@@ -57,7 +57,7 @@ const DistributionInterface = ({ onDataSubmit }) => {
     if (unit === 'POUNDS') {
       return `${quantity} lbs`;
     }
-    return `${quantity} ${availableUnits.find(u => u.key === unit)?.abbreviation} (${weightInPounds.toFixed(1)} lbs)`;
+    return `${quantity} ${unitConverters.getAvailableUnits().find(u => u.key === unit)?.abbreviation} (${weightInPounds.toFixed(1)} lbs)`;
   };
 
   const submitDistribution = () => {
@@ -246,11 +246,13 @@ const DistributionInterface = ({ onDataSubmit }) => {
                       onChange={(e) => updateItem(index, 'unit', e.target.value)}
                       className="form-control-enhanced"
                     >
-                      {availableUnits.map(unit => (
-                        <option key={unit.key} value={unit.key}>
-                          {unit.name} ({unit.abbreviation})
-                        </option>
-                      ))}
+                      {unitConverters.getAvailableUnits()
+                        .filter(unit => unit.key !== 'BOX' && unit.key !== 'BAG')
+                        .map(unit => (
+                          <option key={unit.key} value={unit.key}>
+                            {unit.name} ({unit.abbreviation})
+                          </option>
+                        ))}
                     </select>
                   </div>
                   <div className="input-group">

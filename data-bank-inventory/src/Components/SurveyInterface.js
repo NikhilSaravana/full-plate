@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { FOOD_CATEGORY_MAPPING, getMyPlateCategory } from './FoodCategoryMapper';
-import { UnitConverters } from './UnitConfiguration';
+import { getUnitConverters } from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
 
-const SurveyInterface = ({ onDataSubmit }) => {
+const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
   const [surveyMode, setSurveyMode] = useState('SINGLE'); // SINGLE, BULK, DISTRIBUTION
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
@@ -24,7 +24,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
   const [confirmationConfig, setConfirmationConfig] = useState({});
   const [emptyItemIndices, setEmptyItemIndices] = useState([]);
 
-  const availableUnits = UnitConverters.getAvailableUnits();
+  const unitConverters = getUnitConverters(unitConfig);
 
   const addItem = () => {
     setItems([...items, { foodType: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }]);
@@ -43,7 +43,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
   const getWeightInPounds = (quantity, unit, category = null) => {
     if (!quantity || !unit) return 0;
     if (unit === 'POUND') return parseFloat(quantity);
-    return UnitConverters.convertToStandardWeight(parseFloat(quantity), unit, category);
+    return unitConverters.convertToStandardWeight(parseFloat(quantity), unit, category);
   };
 
   const handleBulkDataParse = () => {
@@ -180,7 +180,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
     if (unit === 'POUND') {
       return `${quantity} lbs`;
     }
-    return `${quantity} ${availableUnits.find(u => u.key === unit)?.abbreviation} (${weightInPounds.toFixed(1)} lbs)`;
+    return `${quantity} ${unitConverters.getAvailableUnits().find(u => u.key === unit)?.abbreviation} (${weightInPounds.toFixed(1)} lbs)`;
   };
 
   return (
@@ -314,11 +314,13 @@ const SurveyInterface = ({ onDataSubmit }) => {
                         onChange={(e) => updateItem(index, 'unit', e.target.value)}
                         className="form-control-enhanced"
                       >
-                        {availableUnits.map(unit => (
-                          <option key={unit.key} value={unit.key}>
-                            {unit.name} ({unit.abbreviation})
-                          </option>
-                        ))}
+                        {unitConverters.getAvailableUnits()
+                          .filter(unit => unit.key !== 'BOX' && unit.key !== 'BAG')
+                          .map(unit => (
+                            <option key={unit.key} value={unit.key}>
+                              {unit.name} ({unit.abbreviation})
+                            </option>
+                          ))}
                       </select>
                     </div>
                     <div className="input-group">
@@ -396,7 +398,7 @@ const SurveyInterface = ({ onDataSubmit }) => {
               <br />
               Example: BREAD, 5, PALLET, 2024-02-15, From food drive
               <br />
-              Available units: {availableUnits.map(u => u.abbreviation).join(', ')}
+              Available units: {unitConverters.getAvailableUnits().map(u => u.abbreviation).join(', ')}
             </p>
             <textarea
               value={bulkData}

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getMyPlateCategory } from './FoodCategoryMapper';
-import { UnitConverters } from './UnitConfiguration';
+import { getUnitConverters } from './UnitConfiguration';
 import { getCombinedAlerts } from './alertUtils';
 
-const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {} }) => {
+const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, unitConfig }) => {
   const [detailedInventory, setDetailedInventory] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -17,7 +17,7 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {} }
   });
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const availableUnits = UnitConverters.getAvailableUnits();
+  const unitConverters = getUnitConverters(unitConfig);
 
   // Load detailed inventory from localStorage
   useEffect(() => {
@@ -48,7 +48,7 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {} }
     memoizedTotalInventory: totalFromSummary, // Use summary total for consistency
     outgoingMetrics,
     detailedInventory,
-    UnitConverters
+    UnitConverters: unitConverters
   });
 
   const handleAddItem = () => {
@@ -58,7 +58,7 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {} }
     }
 
     const category = getMyPlateCategory(newItem.foodType);
-    const weightInPounds = UnitConverters.convertToStandardWeight(
+    const weightInPounds = unitConverters.convertToStandardWeight(
       parseFloat(newItem.quantity), 
       newItem.unit, 
       category
@@ -142,14 +142,14 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {} }
   const getInfoAlerts = () => combinedAlerts.filter(alert => alert.type === 'INFO');
 
   const getDisplayUnits = (item, category) => {
-    const unitConfig = availableUnits.find(u => u.key === item.originalUnit);
+    const unitConfig = unitConverters.getAvailableUnits().find(u => u.key === item.originalUnit);
     if (!unitConfig) return `${item.weight.toLocaleString()} lbs`;
     
     return `${item.originalQuantity} ${unitConfig.abbreviation} (${item.weight.toLocaleString()} lbs)`;
   };
 
   const getPalletEquivalent = (weight, category) => {
-    return UnitConverters.convertFromStandardWeight(weight, 'PALLET', category).toFixed(1);
+    return unitConverters.convertFromStandardWeight(weight, 'PALLET', category).toFixed(1);
   };
 
   const hasDetailedData = Object.values(detailedInventory).some(category => 
@@ -293,7 +293,7 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {} }
                   value={newItem.unit}
                   onChange={(e) => setNewItem({...newItem, unit: e.target.value})}
                 >
-                  {availableUnits.map(unit => (
+                  {unitConverters.getAvailableUnits().map(unit => (
                     <option key={unit.key} value={unit.key}>
                       {unit.name} ({unit.abbreviation})
                     </option>
@@ -324,8 +324,8 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {} }
               
               {newItem.quantity && newItem.unit && newItem.foodType && (
                 <div className="preview-conversion">
-                  <p><strong>Preview:</strong> {newItem.quantity} {availableUnits.find(u => u.key === newItem.unit)?.abbreviation} = {
-                    UnitConverters.convertToStandardWeight(
+                  <p><strong>Preview:</strong> {newItem.quantity} {unitConverters.getAvailableUnits().find(u => u.key === newItem.unit)?.abbreviation} = {
+                    unitConverters.convertToStandardWeight(
                       parseFloat(newItem.quantity), 
                       newItem.unit, 
                       getMyPlateCategory(newItem.foodType)

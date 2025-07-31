@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { MYPLATE_GOALS, SYSTEM_CONFIG, getCategoryStatus, getMyPlateCategory, updateTargetCapacity } from './FoodCategoryMapper';
-import { UnitConverters } from './UnitConfiguration';
+import { getUnitConverters } from './UnitConfiguration';
 
-const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTargetCapacity }) => {
+const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTargetCapacity, unitConfig }) => {
   const [calculations, setCalculations] = useState({});
   const [summary, setSummary] = useState({});
   const [isEditingCapacity, setIsEditingCapacity] = useState(false);
   const [newCapacity, setNewCapacity] = useState(targetCapacity);
   const [displayUnit, setDisplayUnit] = useState('POUNDS'); // POUNDS, CASES, PALLETS
+
+  const unitConverters = getUnitConverters(unitConfig);
 
   useEffect(() => {
     calculateMyPlateBalance();
@@ -45,10 +47,10 @@ const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTarg
     if (displayUnit === 'POUNDS') {
       return `${valueInPounds.toLocaleString()} lbs`;
     } else if (displayUnit === 'CASES') {
-      const cases = UnitConverters.convertFromStandardWeight(valueInPounds, 'CASE', category);
+      const cases = unitConverters.convertFromStandardWeight(valueInPounds, 'CASE', category);
       return `${cases < 1 ? cases.toFixed(3) : cases.toFixed(1)} cases`;
     } else if (displayUnit === 'PALLETS') {
-      const pallets = UnitConverters.convertFromStandardWeight(valueInPounds, 'PALLET', category);
+      const pallets = unitConverters.convertFromStandardWeight(valueInPounds, 'PALLET', category);
       return `${pallets < 1 ? pallets.toFixed(3) : pallets.toFixed(2)} pallets`;
     }
     return `${valueInPounds.toLocaleString()} lbs`;
@@ -59,9 +61,9 @@ const MyPlateCalculator = ({ currentInventory = {}, targetCapacity, onUpdateTarg
     if (displayUnit === 'POUNDS') {
       return valueInPounds;
     } else if (displayUnit === 'CASES') {
-      return UnitConverters.convertFromStandardWeight(valueInPounds, 'CASE', category);
+      return unitConverters.convertFromStandardWeight(valueInPounds, 'CASE', category);
     } else if (displayUnit === 'PALLETS') {
-      return UnitConverters.convertFromStandardWeight(valueInPounds, 'PALLET', category);
+      return unitConverters.convertFromStandardWeight(valueInPounds, 'PALLET', category);
     }
     return valueInPounds;
   };

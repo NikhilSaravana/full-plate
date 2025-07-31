@@ -80,6 +80,9 @@ const Dashboard = () => {
     avgDistributionSize: 0
   });
 
+  // Default unit config for initialization
+  const [unitConfig, setUnitConfig] = useState(DEFAULT_UNIT_CONFIGS);
+
   // Helper to get namespaced key
   const nsKey = (base) => currentUser ? `${base}_${currentUser.uid}` : base;
 
@@ -545,7 +548,7 @@ const Dashboard = () => {
   // Unit conversion functions
   const getUnitWeight = (category, unit) => {
     const unitKey = unit.toUpperCase();
-    const config = DEFAULT_UNIT_CONFIGS[unitKey];
+    const config = unitConfig[unitKey];
     if (!config) return 1;
     let weight;
     if (config.categorySpecific && config.categorySpecific[category]) {
@@ -1606,6 +1609,7 @@ System Health Check:
             currentInventory={currentInventory} 
             onNavigate={setActiveTab}
             outgoingMetrics={outgoingMetrics}
+            unitConfig={unitConfig}
           />
         )}
 
@@ -1613,8 +1617,10 @@ System Health Check:
                 {activeOverviewSection === 'units' && (
                   <UnitConfiguration 
                     onConfigurationChange={(configs) => {
-                      setOrderingUnit(configs.orderingUnit);
+                      setUnitConfig(configs);
                     }}
+                    currentUser={currentUser}
+                    unitConfig={unitConfig}
                   />
                 )}
 
@@ -1741,14 +1747,14 @@ System Health Check:
 
         {activeTab === 'dataentry' && (
           <div className="data-entry-tab">
-            <SurveyInterface onDataSubmit={handleSurveySubmit} />
+            <SurveyInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} />
             {/* Removed: Distribution log from Food Intake tab */}
           </div>
         )}
 
         {activeTab === 'distribution' && (
           <div className="distribution-tab">
-            <DistributionInterface onDataSubmit={handleSurveySubmit} />
+            <DistributionInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} />
           </div>
         )}
 
@@ -1757,6 +1763,7 @@ System Health Check:
             currentInventory={currentInventory} 
             targetCapacity={targetCapacity}
             onUpdateTargetCapacity={handleUpdateTargetCapacity}
+            unitConfig={unitConfig}
           />
         )}
       </main>
