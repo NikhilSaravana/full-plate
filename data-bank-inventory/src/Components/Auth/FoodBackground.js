@@ -85,4 +85,4 @@ const FoodBackground = ({ count = 18 }) => {
   );
 };
 
-export default FoodBackground; 
+export default React.memo(FoodBackground); 

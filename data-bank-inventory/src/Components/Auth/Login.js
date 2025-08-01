@@ -39,29 +39,7 @@ const Login = () => {
     setLoading(false);
   }
 
-  const createDemoAccount = async () => {
-    try {
-      setError('');
-      setLoading(true);
-      
-      // Try to create the demo account
-      await signup('demo@foodbank.com', 'demo123456', 'Demo User');
-      
-      // If successful, the user will be automatically logged in
-    } catch (error) {
-      if (error.code === 'auth/email-already-in-use') {
-        // Account exists, try to log in
-        try {
-          await login('demo@foodbank.com', 'demo123456');
-        } catch (loginError) {
-          setError('Demo account exists but password is incorrect. Please use the correct password or reset it.');
-        }
-      } else {
-        setError('Failed to create demo account: ' + error.message);
-      }
-    }
-    setLoading(false);
-  };
+  
 
   return (
     <div className="auth-container" style={{ position: 'relative', minHeight: '100vh', overflow: 'hidden' }}>
@@ -122,39 +100,7 @@ const Login = () => {
           </p>
         </div>
         
-        {isFirebaseConfigured && (
-          <div className="demo-credentials">
-            <h4>Demo Account:</h4>
-            <p><strong>Email:</strong> demo@foodbank.com</p>
-            <p><strong>Password:</strong> demo123456</p>
-            
-            <div className="demo-actions">
-              <button 
-                type="button"
-                className="demo-btn"
-                onClick={() => {
-                  setEmail('demo@foodbank.com');
-                  setPassword('demo123456');
-                }}
-              >
-                Use Demo Credentials
-              </button>
-              
-              <button 
-                type="button"
-                className="demo-btn create"
-                onClick={createDemoAccount}
-                disabled={loading}
-              >
-                {loading ? 'Creating...' : 'Create Demo Account'}
-              </button>
-            </div>
-            
-            <p className="demo-note">
-              <small>If the demo account doesn't exist, click "Create Demo Account" first.</small>
-            </p>
-          </div>
-        )}
+      
       </div>
     </div>
   );

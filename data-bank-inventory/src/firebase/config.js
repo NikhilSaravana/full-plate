@@ -5,7 +5,6 @@ import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 // if nothing is there ask me for the values
 const isUsingEnvVars = process.env.REACT_APP_FIREBASE_API_KEY && 
                       process.env.REACT_APP_FIREBASE_PROJECT_ID;
-
 // Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "demo-api-key",

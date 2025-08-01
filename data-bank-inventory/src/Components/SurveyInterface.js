@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { FOOD_CATEGORY_MAPPING, getMyPlateCategory } from './FoodCategoryMapper';
+import { getMyPlateCategory } from './FoodCategoryMapper';
 import { getUnitConverters } from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
+
+// High-level categories for simplified selection
+export const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
 
 const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
   const [surveyMode, setSurveyMode] = useState('SINGLE'); // SINGLE, BULK, DISTRIBUTION
@@ -11,7 +14,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
     notes: ''
   });
   const [items, setItems] = useState([
-    { foodType: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }
+    { foodType: '', product: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }
   ]);
   const [bulkData, setBulkData] = useState('');
   const [distributionData, setDistributionData] = useState({
@@ -27,7 +30,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
   const unitConverters = getUnitConverters(unitConfig);
 
   const addItem = () => {
-    setItems([...items, { foodType: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }]);
+    setItems([...items, { foodType: '', product: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }]);
   };
 
   const removeItem = (index) => {
@@ -42,7 +45,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
 
   const getWeightInPounds = (quantity, unit, category = null) => {
     if (!quantity || !unit) return 0;
-    if (unit === 'POUND') return parseFloat(quantity);
+    if (unit === 'POUND' || unit === 'POUNDS') return parseFloat(quantity);
     return unitConverters.convertToStandardWeight(parseFloat(quantity), unit, category);
   };
 
@@ -107,7 +110,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
       const categoryTotals = {};
       items.forEach(item => {
         if (item.foodType && item.quantity) {
-          const category = getMyPlateCategory(item.foodType);
+          const category = item.foodType;
           const weightInPounds = getWeightInPounds(item.quantity, item.unit, category);
           categoryTotals[category] = (categoryTotals[category] || 0) + weightInPounds;
         }
@@ -117,7 +120,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
       // Add converted weights for reference
       surveyData.itemsWithConvertedWeights = items.map(item => ({
         ...item,
-        weightInPounds: item.quantity ? getWeightInPounds(item.quantity, item.unit, getMyPlateCategory(item.foodType)) : 0
+        weightInPounds: item.quantity ? getWeightInPounds(item.quantity, item.unit, item.foodType) : 0
       }));
     }
 
@@ -126,7 +129,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
     }
 
     // Reset form
-    setItems([{ foodType: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }]);
+    setItems([{ foodType: '', product: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }]);
     setFormData({
       date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
       source: 'Direct Donation',
@@ -153,7 +156,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
   };
 
   const getFoodTypeOptions = () => {
-    return Object.keys(FOOD_CATEGORY_MAPPING).sort();
+    return MAIN_FOOD_CATEGORIES;
   };
 
   const getQuickAddButtons = () => {
@@ -167,7 +170,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
   const calculateTotalWeight = () => {
     return items.reduce((total, item) => {
       if (item.quantity && item.foodType) {
-        const category = getMyPlateCategory(item.foodType);
+        const category = item.foodType;
         return total + getWeightInPounds(item.quantity, item.unit, category);
       }
       return total;
@@ -177,7 +180,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
   const getUnitDisplayWeight = (quantity, unit, category) => {
     if (!quantity || !unit) return '';
     const weightInPounds = getWeightInPounds(quantity, unit, category);
-    if (unit === 'POUND') {
+    if (unit === 'POUND' || unit === 'POUNDS') {
       return `${quantity} lbs`;
     }
     return `${quantity} ${unitConverters.getAvailableUnits().find(u => u.key === unit)?.abbreviation} (${weightInPounds.toFixed(1)} lbs)`;
@@ -261,7 +264,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
                     onClick={() => {
                       // Find first empty item (no foodType and no quantity)
                       const emptyIndex = items.findIndex(i => !i.foodType && !i.quantity);
-                      const newItem = { foodType: item, quantity: '', unit: 'POUND', expirationDate: '', notes: '' };
+                      const newItem = { foodType: item, product: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' };
                       if (emptyIndex !== -1) {
                         // Replace the empty item
                         const updated = [...items];
@@ -284,17 +287,27 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
                 <div className="item-main-row">
                   <div className="item-inputs">
                     <div className="input-group">
-                      <label className="form-label-enhanced">Food Type</label>
+                      <label className="form-label-enhanced">Category</label>
                       <select
                         value={item.foodType}
                         onChange={(e) => updateItem(index, 'foodType', e.target.value)}
                         className="form-control-enhanced"
                       >
-                        <option value="">Select Food Type</option>
+                        <option value="">Select Category</option>
                         {getFoodTypeOptions().map(option => (
                           <option key={option} value={option}>{option}</option>
                         ))}
                       </select>
+                    </div>
+                    <div className="input-group">
+                      <label className="form-label-enhanced">Product</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Apples, Yogurt"
+                        className="form-control-enhanced"
+                        value={item.product}
+                        onChange={(e) => updateItem(index, 'product', e.target.value)}
+                      />
                     </div>
                     <div className="input-group">
                       <label className="form-label-enhanced">Quantity</label>
@@ -336,14 +349,14 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
                     <div className="input-group">
                       <label className="form-label-enhanced">Category</label>
                       <div className="category-display">
-                        {item.foodType ? getMyPlateCategory(item.foodType) : 'Select food first'}
+                        {item.foodType || (item.product ? getMyPlateCategory(item.product) : 'Select category')}
                       </div>
                     </div>
                     <div className="input-group">
                       <label className="form-label-enhanced">Weight</label>
                       <div className="weight-display">
                         {item.quantity && item.foodType ? 
-                          getUnitDisplayWeight(item.quantity, item.unit, getMyPlateCategory(item.foodType)) : 
+                          getUnitDisplayWeight(item.quantity, item.unit, item.foodType) : 
                           'Enter quantity'
                         }
                       </div>

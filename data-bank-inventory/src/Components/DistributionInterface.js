@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { FOOD_CATEGORY_MAPPING, getMyPlateCategory } from './FoodCategoryMapper';
+import { getMyPlateCategory } from './FoodCategoryMapper';
 import { getUnitConverters } from './UnitConfiguration';
+
 import ConfirmationDialog from './ConfirmationDialog';
+
+// High-level categories shown in the dropdown instead of the full 30+ list
+export const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
 
 const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
   const [formData, setFormData] = useState({
@@ -10,7 +14,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
     notes: ''
   });
   const [items, setItems] = useState([
-    { foodType: '', quantity: '', unit: 'POUND', notes: '' }
+    { foodType: '', product: '', quantity: '', unit: 'POUND', notes: '' }
   ]);
   const [clientInfo, setClientInfo] = useState({
     clientsServed: '',
@@ -22,7 +26,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
   const unitConverters = getUnitConverters(unitConfig);
 
   const addItem = () => {
-    setItems([...items, { foodType: '', quantity: '', unit: 'POUND', notes: '' }]);
+    setItems([...items, { foodType: '', product: '', quantity: '', unit: 'POUND', notes: '' }]);
   };
 
   const removeItem = (index) => {
@@ -37,14 +41,14 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
 
   const getWeightInPounds = (quantity, unit, category = null) => {
     if (!quantity || !unit) return 0;
-    if (unit === 'POUNDS') return parseFloat(quantity);
+    if (unit === 'POUNDS' || unit === 'POUND') return parseFloat(quantity);
     return unitConverters.convertToStandardWeight(parseFloat(quantity), unit, category);
   };
 
   const calculateTotalWeight = () => {
     return items.reduce((total, item) => {
       if (item.quantity && item.foodType) {
-        const category = getMyPlateCategory(item.foodType);
+        const category = item.foodType; // Already category selection
         return total + getWeightInPounds(item.quantity, item.unit, category);
       }
       return total;
@@ -54,7 +58,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
   const getUnitDisplayWeight = (quantity, unit, category) => {
     if (!quantity || !unit) return '';
     const weightInPounds = getWeightInPounds(quantity, unit, category);
-    if (unit === 'POUNDS') {
+    if (unit === 'POUNDS' || unit === 'POUND') {
       return `${quantity} lbs`;
     }
     return `${quantity} ${unitConverters.getAvailableUnits().find(u => u.key === unit)?.abbreviation} (${weightInPounds.toFixed(1)} lbs)`;
@@ -81,7 +85,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
     const categoryTotals = {};
     items.forEach(item => {
       if (item.foodType && item.quantity) {
-        const category = getMyPlateCategory(item.foodType);
+        const category = item.foodType; // Already category selection
         const weightInPounds = getWeightInPounds(item.quantity, item.unit, category);
         categoryTotals[category] = (categoryTotals[category] || 0) + weightInPounds;
       }
@@ -95,7 +99,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
       clientsServed: parseInt(clientInfo.clientsServed) || 0,
       items: items.map(item => ({
         ...item,
-        weightInPounds: getWeightInPounds(item.quantity, item.unit, getMyPlateCategory(item.foodType))
+        weightInPounds: getWeightInPounds(item.quantity, item.unit, item.foodType)
       })),
       categoryTotals,
       totalDistributed: calculateTotalWeight(),
@@ -107,7 +111,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
     }
 
     // Reset form
-    setItems([{ foodType: '', quantity: '', unit: 'POUND', notes: '' }]);
+    setItems([{ foodType: '', product: '', quantity: '', unit: 'POUND', notes: '' }]);
     setFormData({
       date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
       recipient: '',
@@ -128,7 +132,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
   };
 
   const getFoodTypeOptions = () => {
-    return Object.keys(FOOD_CATEGORY_MAPPING).sort();
+    return MAIN_FOOD_CATEGORIES;
   };
 
   const getQuickAddButtons = () => {
@@ -192,7 +196,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
                   onClick={() => {
                     // Find first empty item (no foodType and no quantity)
                     const emptyIndex = items.findIndex(i => !i.foodType && !i.quantity);
-                    const newItem = { foodType: item, quantity: '', unit: 'POUND', notes: '' };
+                    const newItem = { foodType: item, product: '', quantity: '', unit: 'POUND', notes: '' };
                     if (emptyIndex !== -1) {
                       // Replace the empty item
                       const updated = [...items];
@@ -216,17 +220,27 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
               <div className="item-main-row">
                 <div className="item-inputs">
                   <div className="input-group">
-                    <label className="form-label-enhanced">Food Type</label>
+                    <label className="form-label-enhanced">Category</label>
                     <select
                       value={item.foodType}
                       onChange={(e) => updateItem(index, 'foodType', e.target.value)}
                       className="form-control-enhanced"
                     >
-                      <option value="">Select Food Type</option>
+                      <option value="">Select Category</option>
                       {getFoodTypeOptions().map(type => (
                         <option key={type} value={type}>{type}</option>
                       ))}
                     </select>
+                  </div>
+                  <div className="input-group">
+                    <label className="form-label-enhanced">Product</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., White Bread, Low-fat Milk"
+                      className="form-control-enhanced"
+                      value={item.product}
+                      onChange={(e) => updateItem(index, 'product', e.target.value)}
+                    />
                   </div>
                   <div className="input-group">
                     <label className="form-label-enhanced">Quantity</label>
@@ -258,14 +272,14 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
                   <div className="input-group">
                     <label className="form-label-enhanced">Category</label>
                     <div className="category-display">
-                      {item.foodType ? getMyPlateCategory(item.foodType) : 'Select food first'}
+                      {item.foodType || (item.product ? getMyPlateCategory(item.product) : 'Select category')}
                     </div>
                   </div>
                   <div className="input-group">
                     <label className="form-label-enhanced">Weight</label>
                     <div className="weight-display">
                       {item.quantity && item.foodType ? 
-                        getUnitDisplayWeight(item.quantity, item.unit, getMyPlateCategory(item.foodType)) : 
+                        getUnitDisplayWeight(item.quantity, item.unit, item.foodType) : 
                         'Enter quantity'
                       }
                     </div>

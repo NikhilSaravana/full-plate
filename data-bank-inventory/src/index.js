@@ -4,6 +4,13 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+// Disable console logs for regular users (production builds)
+if (process.env.NODE_ENV === 'production') {
+  ['log', 'info', 'debug', 'warn'].forEach((method) => {
+    console[method] = () => {};
+  });
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
