@@ -45,6 +45,7 @@ const ConfirmationDialog = ({
         </div>
         <div className="confirmation-actions">
           <button 
+            type="button"
             className="btn btn-light"
             onClick={onClose}
             style={{ minWidth: '100px' }}
@@ -52,6 +53,7 @@ const ConfirmationDialog = ({
             {cancelText}
           </button>
           <button 
+            type="button"
             className={`btn ${type === 'danger' ? 'btn-danger' : type === 'warning' ? 'btn-warning' : 'btn-primary'}`}
             onClick={() => {
               onConfirm();

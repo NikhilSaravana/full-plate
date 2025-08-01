@@ -130,13 +130,18 @@ const Dashboard = () => {
 
   // Manual reset function for today's metrics
   const resetTodayMetrics = () => {
-    setOutgoingMetrics(prev => ({
-      ...prev,
-      totalDistributedToday: 0,
-      clientsServedToday: 0
-    }));
-    console.log('Manual reset: Today\'s metrics reset to zero');
-    showAutoSaveStatus('Today\'s metrics reset to zero', false);
+    try {
+      setOutgoingMetrics(prev => ({
+        ...prev,
+        totalDistributedToday: 0,
+        clientsServedToday: 0
+      }));
+      console.log('Manual reset: Today\'s metrics reset to zero');
+      showAutoSaveStatus('Today\'s metrics reset to zero', false);
+    } catch (error) {
+      console.error('Error resetting today metrics:', error);
+      showAutoSaveStatus('Failed to reset today\'s metrics', true);
+    }
   };
 
 
@@ -1035,19 +1040,19 @@ System Health Check:
       'Reset All Data',
       'This will permanently delete all your inventory data, distribution history, and settings. This action cannot be undone. Are you sure you want to continue?',
       () => {
-      localStorage.clear();
-      setCurrentInventory({
-        'DAIRY': 0,
-        'GRAIN': 0,
-        'PROTEIN': 0,
-        'FRUIT': 0,
-        'VEG': 0,
-        'PRODUCE': 0,
-        'MISC': 0
-      });
-      setRecentActivity([]);
+        localStorage.clear();
+        setCurrentInventory({
+          'DAIRY': 0,
+          'GRAIN': 0,
+          'PROTEIN': 0,
+          'FRUIT': 0,
+          'VEG': 0,
+          'PRODUCE': 0,
+          'MISC': 0
+        });
+        setRecentActivity([]);
         setDistributionHistory([]);
-      setIsFirstTime(true);
+        setIsFirstTime(true);
         showAutoSaveStatus('All data has been reset', false);
       }
     );
@@ -1293,14 +1298,32 @@ System Health Check:
               <div className="tooltip">System Health Check</div>
             </div>
             <div className="tooltip-wrapper">
-              <button onClick={resetTodayMetrics} className="btn btn-warning" style={{ minWidth: 'auto', padding: '8px 12px' }}>
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  resetTodayMetrics();
+                }} 
+                className="btn btn-warning" 
+                style={{ minWidth: 'auto', padding: '8px 12px' }}
+              >
                 Reset Today
               </button>
               <div className="tooltip">Reset Today's Metrics</div>
             </div>
 
             <div className="tooltip-wrapper">
-              <button onClick={resetAllData} className="btn btn-danger" style={{ minWidth: 'auto', padding: '8px 12px' }}>
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  resetAllData();
+                }} 
+                className="btn btn-danger" 
+                style={{ minWidth: 'auto', padding: '8px 12px' }}
+              >
                 Reset
               </button>
               <div className="tooltip">Reset All Data</div>
