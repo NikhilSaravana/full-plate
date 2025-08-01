@@ -551,6 +551,25 @@ class FirestoreService {
     }
   }
 
+  async resetTodayMetrics(userId, dateString) {
+    try {
+      const metricsRef = doc(db, 'users', userId, 'metrics', dateString);
+      await setDoc(metricsRef, {
+        totalDistributedToday: 0,
+        clientsServedToday: 0,
+        lastUpdated: new Date(),
+        resetAt: new Date()
+      });
+      return { success: true, message: 'Today\'s metrics reset in Firebase' };
+    } catch (error) {
+      console.error('Error resetting today\'s metrics:', error);
+      return { 
+        success: false, 
+        error: this.handleError(error, 'today metrics reset') 
+      };
+    }
+  }
+
   // Add a new distribution record
   async addDistributionRecord(userId, distribution) {
     try {
@@ -579,6 +598,67 @@ class FirestoreService {
         this.listeners.delete(key);
       }
     });
+  }
+
+  // Complete user data reset
+  async resetAllUserData(userId) {
+    try {
+      const batch = writeBatch(db);
+
+      // Delete inventory data
+      const inventoryRef = doc(db, 'users', userId, 'data', 'inventory');
+      batch.delete(inventoryRef);
+
+      // Delete activity data
+      const activityRef = doc(db, 'users', userId, 'data', 'activity');
+      batch.delete(activityRef);
+
+      // Delete user preferences/settings
+      const prefsRef = doc(db, 'users', userId, 'settings', 'preferences');
+      batch.delete(prefsRef);
+
+      // Execute batch delete for main documents
+      await batch.commit();
+
+      // Delete all distributions (need to fetch and delete individually due to subcollection)
+      const distributionsRef = collection(db, 'users', userId, 'distributions');
+      const distributionsSnapshot = await getDocs(distributionsRef);
+      
+      if (!distributionsSnapshot.empty) {
+        const deleteBatch = writeBatch(db);
+        distributionsSnapshot.docs.forEach((doc) => {
+          deleteBatch.delete(doc.ref);
+        });
+        await deleteBatch.commit();
+      }
+
+      // Delete all metrics (daily metrics)
+      const metricsRef = collection(db, 'users', userId, 'metrics');
+      const metricsSnapshot = await getDocs(metricsRef);
+      
+      if (!metricsSnapshot.empty) {
+        const metricsBatch = writeBatch(db);
+        metricsSnapshot.docs.forEach((doc) => {
+          metricsBatch.delete(doc.ref);
+        });
+        await metricsBatch.commit();
+      }
+
+      // Clean up listeners for this user
+      this.unsubscribeAll(userId);
+
+      return { 
+        success: true, 
+        message: 'All user data deleted successfully from Firebase',
+        deletedCollections: ['inventory', 'activity', 'preferences', 'distributions', 'metrics']
+      };
+    } catch (error) {
+      console.error('Error resetting user data:', error);
+      return { 
+        success: false, 
+        error: this.handleError(error, 'complete data reset') 
+      };
+    }
   }
 
   // Connection status monitoring

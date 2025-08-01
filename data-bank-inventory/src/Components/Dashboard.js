@@ -129,15 +129,31 @@ const Dashboard = () => {
   const getTodayString = () => new Date().toISOString().split('T')[0];
 
   // Manual reset function for today's metrics
-  const resetTodayMetrics = () => {
+  const resetTodayMetrics = async () => {
     try {
+      // Reset local state
       setOutgoingMetrics(prev => ({
         ...prev,
         totalDistributedToday: 0,
         clientsServedToday: 0
       }));
-      console.log('Manual reset: Today\'s metrics reset to zero');
-      showAutoSaveStatus('Today\'s metrics reset to zero', false);
+      
+      // Reset Firebase metrics if user is authenticated
+      if (currentUser) {
+        const today = getTodayString();
+        const result = await firestoreService.resetTodayMetrics(currentUser.uid, today);
+        
+        if (result.success) {
+          console.log('Manual reset: Today\'s metrics reset to zero (local and cloud)');
+          showAutoSaveStatus('Today\'s metrics reset to zero (local and cloud)', false);
+        } else {
+          console.log('Manual reset: Today\'s metrics reset locally, cloud reset failed');
+          showAutoSaveStatus('Today\'s metrics reset locally, cloud reset failed: ' + result.error, true);
+        }
+      } else {
+        console.log('Manual reset: Today\'s metrics reset to zero (local only)');
+        showAutoSaveStatus('Today\'s metrics reset to zero (local only)', false);
+      }
     } catch (error) {
       console.error('Error resetting today metrics:', error);
       showAutoSaveStatus('Failed to reset today\'s metrics', true);
@@ -1038,22 +1054,49 @@ System Health Check:
   const resetAllData = () => {
     showConfirmation(
       'Reset All Data',
-      'This will permanently delete all your inventory data, distribution history, and settings. This action cannot be undone. Are you sure you want to continue?',
-      () => {
-        localStorage.clear();
-        setCurrentInventory({
-          'DAIRY': 0,
-          'GRAIN': 0,
-          'PROTEIN': 0,
-          'FRUIT': 0,
-          'VEG': 0,
-          'PRODUCE': 0,
-          'MISC': 0
-        });
-        setRecentActivity([]);
-        setDistributionHistory([]);
-        setIsFirstTime(true);
-        showAutoSaveStatus('All data has been reset', false);
+      'This will permanently delete all your inventory data, distribution history, and settings from both local storage and the cloud. This action cannot be undone. Are you sure you want to continue?',
+      async () => {
+        try {
+          showAutoSaveStatus('Resetting data...', false);
+          
+          // Clear local storage
+          localStorage.clear();
+          
+          // Reset component state
+          setCurrentInventory({
+            'DAIRY': 0,
+            'GRAIN': 0,
+            'PROTEIN': 0,
+            'FRUIT': 0,
+            'VEG': 0,
+            'PRODUCE': 0,
+            'MISC': 0
+          });
+          setRecentActivity([]);
+          setDistributionHistory([]);
+          setOutgoingMetrics({
+            totalDistributedToday: 0,
+            clientsServedToday: 0
+          });
+          setIsFirstTime(true);
+          
+          // Reset Firebase data if user is authenticated
+          if (currentUser) {
+            showAutoSaveStatus('Clearing cloud data...', false);
+            const result = await firestoreService.resetAllUserData(currentUser.uid);
+            
+            if (result.success) {
+              showAutoSaveStatus('All data has been reset (local and cloud)', false);
+            } else {
+              showAutoSaveStatus('Local data reset, but cloud deletion failed: ' + result.error, true);
+            }
+          } else {
+            showAutoSaveStatus('All local data has been reset', false);
+          }
+        } catch (error) {
+          console.error('Error during reset:', error);
+          showAutoSaveStatus('Reset partially completed - some errors occurred', true);
+        }
       }
     );
   };
