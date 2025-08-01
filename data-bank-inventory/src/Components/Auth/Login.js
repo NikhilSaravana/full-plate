@@ -34,9 +34,9 @@ const Login = () => {
       } else {
         setError('Failed to log in: ' + (error.message || 'Unknown error'));
       }
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   

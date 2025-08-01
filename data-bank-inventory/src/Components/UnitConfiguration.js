@@ -72,7 +72,13 @@ const UnitConfiguration = ({ onConfigurationChange, currentUser, unitConfig }) =
           // Fallback to localStorage if Firestore is empty
           const saved = localStorage.getItem(key);
           if (saved) {
-            loaded = JSON.parse(saved);
+            try {
+              loaded = JSON.parse(saved);
+            } catch (error) {
+              console.error('[UnitConfig] Invalid JSON in localStorage, using defaults:', error);
+              localStorage.removeItem(key); // Clean up corrupted data
+              loaded = null;
+            }
           }
         }
         if (loaded) {
@@ -106,6 +112,15 @@ const UnitConfiguration = ({ onConfigurationChange, currentUser, unitConfig }) =
       }
     } catch (error) {
       console.error('[UnitConfig] Error saving unit configurations:', error);
+      if (error.name === 'QuotaExceededError') {
+        // Still save to Firestore even if localStorage fails
+        try {
+          firestoreService.saveUserPreferences(currentUser.uid, { unitConfigurations: configurations });
+          console.log('[UnitConfig] Saved to Firestore only due to localStorage quota exceeded');
+        } catch (firestoreError) {
+          console.error('[UnitConfig] Failed to save to both localStorage and Firestore:', firestoreError);
+        }
+      }
     }
   }, [configurations, currentUser, hasLoadedFromFirestore, onConfigurationChange, lastSavedConfig]);
 
@@ -118,12 +133,31 @@ const UnitConfiguration = ({ onConfigurationChange, currentUser, unitConfig }) =
   const saveConfigurations = () => {
     if (!currentUser) return;
     const key = getUnitConfigKey();
-    localStorage.setItem(key, JSON.stringify(configurations));
-    firestoreService.saveUserPreferences(currentUser.uid, { unitConfigurations: configurations });
-    setLastSavedConfig(JSON.stringify(configurations));
-    setIsEditing(false);
-    setEditingCategory(null);
-    console.log('[UnitConfig] saveConfigurations called');
+    const configString = JSON.stringify(configurations);
+    
+    try {
+      localStorage.setItem(key, configString);
+      firestoreService.saveUserPreferences(currentUser.uid, { unitConfigurations: configurations });
+      setLastSavedConfig(configString);
+      setIsEditing(false);
+      setEditingCategory(null);
+      console.log('[UnitConfig] saveConfigurations called');
+    } catch (error) {
+      console.error('[UnitConfig] Error in saveConfigurations:', error);
+      if (error.name === 'QuotaExceededError') {
+        // Still save to Firestore and update UI even if localStorage fails
+        try {
+          firestoreService.saveUserPreferences(currentUser.uid, { unitConfigurations: configurations });
+          setLastSavedConfig(configString);
+          setIsEditing(false);
+          setEditingCategory(null);
+          alert('Configuration saved to cloud. Local storage is full.');
+        } catch (firestoreError) {
+          console.error('[UnitConfig] Failed to save configuration:', firestoreError);
+          alert('Failed to save configuration. Please try again.');
+        }
+      }
+    }
   };
 
   const updateUnitWeight = (unitType, category, newWeight) => {
@@ -317,7 +351,16 @@ const UnitConfiguration = ({ onConfigurationChange, currentUser, unitConfig }) =
 export const UnitConverters = {
   getUnitConfigs: () => {
     const saved = localStorage.getItem('unitConfigurations');
-    return saved ? JSON.parse(saved) : DEFAULT_UNIT_CONFIGS;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (error) {
+        console.error('[UnitConverters] Invalid JSON in localStorage, using defaults:', error);
+        localStorage.removeItem('unitConfigurations'); // Clean up corrupted data
+        return DEFAULT_UNIT_CONFIGS;
+      }
+    }
+    return DEFAULT_UNIT_CONFIGS;
   },
   
   convertToStandardWeight: (quantity, unitType, category = null) => {

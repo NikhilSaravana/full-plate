@@ -3,12 +3,16 @@ import { getMyPlateCategory } from './FoodCategoryMapper';
 import { getUnitConverters } from './UnitConfiguration';
 import { getCombinedAlerts } from './alertUtils';
 
+// High-level categories for consistency
+const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
+
 const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, unitConfig }) => {
   const [detailedInventory, setDetailedInventory] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [newItem, setNewItem] = useState({
     foodType: '',
+    product: '',
     quantity: '',
     unit: 'POUNDS',
     expirationDate: '',
@@ -23,14 +27,43 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, 
   useEffect(() => {
     const savedDetailedInventory = localStorage.getItem('detailedInventory');
     if (savedDetailedInventory) {
-      setDetailedInventory(JSON.parse(savedDetailedInventory));
+      try {
+        setDetailedInventory(JSON.parse(savedDetailedInventory));
+      } catch (error) {
+        console.error('[InventoryManager] Invalid JSON in localStorage, resetting inventory:', error);
+        localStorage.removeItem('detailedInventory'); // Clean up corrupted data
+        setDetailedInventory({});
+      }
     }
   }, []);
 
-  // Save detailed inventory to localStorage whenever it changes
+  // Save detailed inventory to localStorage whenever it changes with quota handling
   useEffect(() => {
     if (Object.keys(detailedInventory).length > 0) {
-      localStorage.setItem('detailedInventory', JSON.stringify(detailedInventory));
+      try {
+        localStorage.setItem('detailedInventory', JSON.stringify(detailedInventory));
+      } catch (error) {
+        console.error('[InventoryManager] Failed to save to localStorage:', error);
+        if (error.name === 'QuotaExceededError') {
+          // Try to free up space by removing old data
+          const keysToRemove = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('old_') || key.includes('backup_')) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(key => localStorage.removeItem(key));
+          
+          // Try again after cleanup
+          try {
+            localStorage.setItem('detailedInventory', JSON.stringify(detailedInventory));
+          } catch (retryError) {
+            console.error('[InventoryManager] Storage quota exceeded even after cleanup');
+            alert('Storage space is full. Some data may not be saved locally.');
+          }
+        }
+      }
     }
   }, [detailedInventory]);
 
@@ -57,18 +90,24 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, 
       return;
     }
 
-    const category = getMyPlateCategory(newItem.foodType);
+    const numQuantity = parseFloat(newItem.quantity);
+    if (isNaN(numQuantity) || numQuantity <= 0) {
+      alert('Please enter a valid positive quantity');
+      return;
+    }
+
+    const category = newItem.foodType; // Already a category
     const weightInPounds = unitConverters.convertToStandardWeight(
-      parseFloat(newItem.quantity), 
+      numQuantity, 
       newItem.unit, 
       category
     );
 
     const itemData = {
       id: Date.now(),
-      name: newItem.foodType,
+              name: newItem.product || newItem.foodType,
       weight: weightInPounds,
-      originalQuantity: parseFloat(newItem.quantity),
+      originalQuantity: numQuantity,
       originalUnit: newItem.unit,
       expiration: newItem.expirationDate || 'N/A',
       source: newItem.source,
@@ -85,6 +124,7 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, 
 
     setNewItem({
       foodType: '',
+      product: '',
       quantity: '',
       unit: 'POUNDS',
       expirationDate: '',
@@ -276,11 +316,20 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, 
             <div className="add-item-form">
               <h3>Add Individual Inventory Item</h3>
               <div className="form-grid">
-                <input
-                  type="text"
-                  placeholder="Food Type (e.g., BREAD, MILK)"
+                <select
                   value={newItem.foodType}
                   onChange={(e) => setNewItem({...newItem, foodType: e.target.value})}
+                >
+                  <option value="">Select Category</option>
+                  {MAIN_FOOD_CATEGORIES.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Product name (e.g., White Bread, 2% Milk)"
+                  value={newItem.product}
+                  onChange={(e) => setNewItem({...newItem, product: e.target.value})}
                 />
                 <input
                   type="number"
@@ -325,11 +374,15 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, 
               {newItem.quantity && newItem.unit && newItem.foodType && (
                 <div className="preview-conversion">
                   <p><strong>Preview:</strong> {newItem.quantity} {unitConverters.getAvailableUnits().find(u => u.key === newItem.unit)?.abbreviation} = {
-                    unitConverters.convertToStandardWeight(
-                      parseFloat(newItem.quantity), 
-                      newItem.unit, 
-                      getMyPlateCategory(newItem.foodType)
-                    ).toFixed(1)
+                    (() => {
+                      const numQuantity = parseFloat(newItem.quantity);
+                      if (isNaN(numQuantity) || numQuantity <= 0) return '0.0';
+                      return unitConverters.convertToStandardWeight(
+                        numQuantity, 
+                        newItem.unit, 
+                        newItem.foodType
+                      ).toFixed(1);
+                    })()
                   } lbs</p>
                 </div>
               )}

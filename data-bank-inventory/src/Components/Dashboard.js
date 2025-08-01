@@ -139,17 +139,7 @@ const Dashboard = () => {
     showAutoSaveStatus('Today\'s metrics reset to zero', false);
   };
 
-  // Test function to simulate midnight reset (for debugging)
-  const testMidnightReset = () => {
-    console.log('Testing midnight reset...');
-    // Clear the last calculated date to force recalculation
-    localStorage.removeItem(nsKey('lastCalculatedDate'));
-    // Reset today's metrics
-    resetTodayMetrics();
-    // Force recalculation
-    setDistributionHistory(d => [...d]);
-    showAutoSaveStatus('Midnight reset test completed', false);
-  };
+
 
   // Load today's metrics from Firestore on login
   useEffect(() => {
@@ -1116,7 +1106,13 @@ System Health Check:
   useEffect(() => {
     const savedDetailedInventory = localStorage.getItem('detailedInventory');
     if (savedDetailedInventory) {
-      setDetailedInventory(JSON.parse(savedDetailedInventory));
+      try {
+        setDetailedInventory(JSON.parse(savedDetailedInventory));
+      } catch (error) {
+        console.error('[Dashboard] Invalid JSON in localStorage, resetting detailed inventory:', error);
+        localStorage.removeItem('detailedInventory'); // Clean up corrupted data
+        setDetailedInventory({});
+      }
     }
   }, []);
 
@@ -1302,14 +1298,7 @@ System Health Check:
               </button>
               <div className="tooltip">Reset Today's Metrics</div>
             </div>
-            {process.env.NODE_ENV === 'development' && (
-              <div className="tooltip-wrapper">
-                <button onClick={testMidnightReset} className="btn btn-secondary" style={{ minWidth: 'auto', padding: '8px 12px' }}>
-                  Test Reset
-                </button>
-                <div className="tooltip">Test Midnight Reset (Dev Only)</div>
-              </div>
-            )}
+
             <div className="tooltip-wrapper">
               <button onClick={resetAllData} className="btn btn-danger" style={{ minWidth: 'auto', padding: '8px 12px' }}>
                 Reset

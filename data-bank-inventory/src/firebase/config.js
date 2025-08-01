@@ -6,14 +6,36 @@ import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 const isUsingEnvVars = process.env.REACT_APP_FIREBASE_API_KEY && 
                       process.env.REACT_APP_FIREBASE_PROJECT_ID;
 // Firebase configuration
-const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "demo-api-key",
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "demo-project.firebaseapp.com",
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "demo-project",
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "demo-project.appspot.com",
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "123456789",
-  appId: process.env.REACT_APP_FIREBASE_APP_ID || "1:123456789:web:abcdef123456"
-};
+const firebaseConfig = (() => {
+  // In production, require all environment variables
+  if (process.env.NODE_ENV === 'production') {
+    const requiredEnvVars = [
+      'REACT_APP_FIREBASE_API_KEY',
+      'REACT_APP_FIREBASE_AUTH_DOMAIN', 
+      'REACT_APP_FIREBASE_PROJECT_ID',
+      'REACT_APP_FIREBASE_STORAGE_BUCKET',
+      'REACT_APP_FIREBASE_MESSAGING_SENDER_ID',
+      'REACT_APP_FIREBASE_APP_ID'
+    ];
+    
+    const missing = requiredEnvVars.filter(envVar => !process.env[envVar]);
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required Firebase environment variables in production: ${missing.join(', ')}. ` +
+        'Please configure your Firebase environment variables before deploying.'
+      );
+    }
+  }
+
+  return {
+    apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "demo-api-key",
+    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "demo-project.firebaseapp.com",
+    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "demo-project",
+    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "demo-project.appspot.com",
+    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "123456789",
+    appId: process.env.REACT_APP_FIREBASE_APP_ID || "1:123456789:web:abcdef123456"
+  };
+})();
 
 // Log config
 if (process.env.NODE_ENV === 'development') {

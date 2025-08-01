@@ -41,8 +41,10 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
 
   const getWeightInPounds = (quantity, unit, category = null) => {
     if (!quantity || !unit) return 0;
-    if (unit === 'POUNDS' || unit === 'POUND') return parseFloat(quantity);
-    return unitConverters.convertToStandardWeight(parseFloat(quantity), unit, category);
+    const numQuantity = parseFloat(quantity);
+    if (isNaN(numQuantity) || numQuantity < 0) return 0;
+    if (unit === 'POUNDS' || unit === 'POUND') return numQuantity;
+    return unitConverters.convertToStandardWeight(numQuantity, unit, category);
   };
 
   const calculateTotalWeight = () => {
@@ -107,7 +109,20 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
     };
 
     if (onDataSubmit) {
-      onDataSubmit(distributionData);
+      try {
+        onDataSubmit(distributionData);
+      } catch (error) {
+        console.error('Error submitting distribution data:', error);
+        setConfirmationConfig({
+          type: 'error',
+          title: 'Submission Failed',
+          message: 'Failed to save distribution data. Please try again.',
+          confirmText: 'OK',
+          onConfirm: () => setShowConfirmation(false)
+        });
+        setShowConfirmation(true);
+        return; // Don't reset form on error
+      }
     }
 
     // Reset form
@@ -136,9 +151,20 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
   };
 
   const getQuickAddButtons = () => {
+    // Map common food items to their categories and product names
     const commonItems = [
-      'BREAD', 'MILK', 'RICE', 'PASTA', 'CHICKEN', 'BEANS', 
-      'CORN', 'FRUIT', 'VEGETABLES', 'CEREAL', 'CHEESE', 'EGGS'
+      { category: 'GRAIN', product: 'Bread' },
+      { category: 'DAIRY', product: 'Milk' },
+      { category: 'GRAIN', product: 'Rice' },
+      { category: 'GRAIN', product: 'Pasta' },
+      { category: 'PROTEIN', product: 'Chicken' },
+      { category: 'PROTEIN', product: 'Beans' },
+      { category: 'VEG', product: 'Corn' },
+      { category: 'FRUIT', product: 'Mixed Fruit' },
+      { category: 'VEG', product: 'Mixed Vegetables' },
+      { category: 'GRAIN', product: 'Cereal' },
+      { category: 'DAIRY', product: 'Cheese' },
+      { category: 'PROTEIN', product: 'Eggs' }
     ];
     return commonItems;
   };
@@ -192,11 +218,17 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
             <div className="quick-add-buttons">
               {getQuickAddButtons().map(item => (
                 <button
-                  key={item}
+                  key={`${item.category}-${item.product}`}
                   onClick={() => {
                     // Find first empty item (no foodType and no quantity)
                     const emptyIndex = items.findIndex(i => !i.foodType && !i.quantity);
-                    const newItem = { foodType: item, product: '', quantity: '', unit: 'POUND', notes: '' };
+                    const newItem = { 
+                      foodType: item.category, 
+                      product: item.product, 
+                      quantity: '', 
+                      unit: 'POUND', 
+                      notes: '' 
+                    };
                     if (emptyIndex !== -1) {
                       // Replace the empty item
                       const updated = [...items];
@@ -209,7 +241,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
                   }}
                   className="btn btn-light quick-add-item"
                 >
-                  {item}
+                  {item.product}
                 </button>
               ))}
             </div>
@@ -272,7 +304,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
                   <div className="input-group">
                     <label className="form-label-enhanced">Category</label>
                     <div className="category-display">
-                      {item.foodType || (item.product ? getMyPlateCategory(item.product) : 'Select category')}
+                      {item.foodType || 'Select category first'}
                     </div>
                   </div>
                   <div className="input-group">

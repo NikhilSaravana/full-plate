@@ -45,22 +45,25 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
 
   const getWeightInPounds = (quantity, unit, category = null) => {
     if (!quantity || !unit) return 0;
-    if (unit === 'POUND' || unit === 'POUNDS') return parseFloat(quantity);
-    return unitConverters.convertToStandardWeight(parseFloat(quantity), unit, category);
+    const numQuantity = parseFloat(quantity);
+    if (isNaN(numQuantity) || numQuantity < 0) return 0;
+    if (unit === 'POUND' || unit === 'POUNDS') return numQuantity;
+    return unitConverters.convertToStandardWeight(numQuantity, unit, category);
   };
 
   const handleBulkDataParse = () => {
     try {
-      // Parse CSV-like data: "Food Type, Quantity, Unit, Expiration"
+      // Parse CSV-like data: "Category, Product, Quantity, Unit, Expiration"
       const lines = bulkData.split('\n').filter(line => line.trim());
       const parsedItems = lines.map(line => {
         const parts = line.split(',').map(part => part.trim());
         return {
-          foodType: parts[0] || '',
-          quantity: parts[1] || '',
-          unit: parts[2] || 'POUNDS',
-          expirationDate: parts[3] || '',
-          notes: parts[4] || ''
+          foodType: parts[0] || '', // Category (VEG, FRUIT, etc.)
+          product: parts[1] || '', // Product name (Apples, Bread, etc.)
+          quantity: parts[2] || '',
+          unit: parts[3] || 'POUND',
+          expirationDate: parts[4] || '',
+          notes: parts[5] || ''
         };
       });
       setItems(parsedItems);
@@ -70,7 +73,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
       setConfirmationConfig({
         type: 'error',
         title: 'Parsing Error',
-        message: 'Error parsing bulk data. Please check the format and try again. Make sure each line follows: Food Type, Quantity, Unit, Expiration Date, Notes',
+        message: 'Error parsing bulk data. Please check the format and try again. Make sure each line follows: Category, Product, Quantity, Unit, Expiration Date, Notes',
         confirmText: 'OK',
         onConfirm: () => setShowConfirmation(false)
       });
@@ -125,7 +128,20 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
     }
 
     if (onDataSubmit) {
-      onDataSubmit(surveyData);
+      try {
+        onDataSubmit(surveyData);
+      } catch (error) {
+        console.error('Error submitting survey data:', error);
+        setConfirmationConfig({
+          type: 'error',
+          title: 'Submission Failed',
+          message: 'Failed to save survey data. Please try again.',
+          confirmText: 'OK',
+          onConfirm: () => setShowConfirmation(false)
+        });
+        setShowConfirmation(true);
+        return; // Don't reset form on error
+      }
     }
 
     // Reset form
@@ -160,9 +176,20 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
   };
 
   const getQuickAddButtons = () => {
+    // Map common food items to their categories and product names
     const commonItems = [
-      'BREAD', 'MILK', 'RICE', 'PASTA', 'CHICKEN', 'BEANS', 
-      'CORN', 'FRUIT', 'VEGETABLES', 'CEREAL', 'CHEESE', 'EGGS'
+      { category: 'GRAIN', product: 'Bread' },
+      { category: 'DAIRY', product: 'Milk' },
+      { category: 'GRAIN', product: 'Rice' },
+      { category: 'GRAIN', product: 'Pasta' },
+      { category: 'PROTEIN', product: 'Chicken' },
+      { category: 'PROTEIN', product: 'Beans' },
+      { category: 'VEG', product: 'Corn' },
+      { category: 'FRUIT', product: 'Mixed Fruit' },
+      { category: 'VEG', product: 'Mixed Vegetables' },
+      { category: 'GRAIN', product: 'Cereal' },
+      { category: 'DAIRY', product: 'Cheese' },
+      { category: 'PROTEIN', product: 'Eggs' }
     ];
     return commonItems;
   };
@@ -259,12 +286,19 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
               <div className="quick-add-buttons">
                 {getQuickAddButtons().map(item => (
                   <button
-                    key={item}
+                    key={`${item.category}-${item.product}`}
                     className="btn btn-light quick-add-item"
                     onClick={() => {
                       // Find first empty item (no foodType and no quantity)
                       const emptyIndex = items.findIndex(i => !i.foodType && !i.quantity);
-                      const newItem = { foodType: item, product: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' };
+                      const newItem = { 
+                        foodType: item.category, 
+                        product: item.product, 
+                        quantity: '', 
+                        unit: 'POUND', 
+                        expirationDate: '', 
+                        notes: '' 
+                      };
                       if (emptyIndex !== -1) {
                         // Replace the empty item
                         const updated = [...items];
@@ -276,7 +310,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
                       }
                     }}
                   >
-                    {item}
+                    {item.product}
                   </button>
                 ))}
               </div>
@@ -349,7 +383,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
                     <div className="input-group">
                       <label className="form-label-enhanced">Category</label>
                       <div className="category-display">
-                        {item.foodType || (item.product ? getMyPlateCategory(item.product) : 'Select category')}
+                        {item.foodType || 'Select category first'}
                       </div>
                     </div>
                     <div className="input-group">
@@ -407,16 +441,18 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
           <div className="form-section">
             <h3>Bulk Import</h3>
             <p className="help-text">
-              Enter data in CSV format: Food Type, Quantity, Unit, Expiration Date, Notes (optional)
+              Enter data in CSV format: Category, Product, Quantity, Unit, Expiration Date, Notes (optional)
               <br />
-              Example: BREAD, 5, PALLET, 2024-02-15, From food drive
+              Example: GRAIN, Bread, 5, PALLET, 2024-02-15, From food drive
+              <br />
+              Categories: {MAIN_FOOD_CATEGORIES.join(', ')}
               <br />
               Available units: {unitConverters.getAvailableUnits().map(u => u.abbreviation).join(', ')}
             </p>
             <textarea
               value={bulkData}
               onChange={(e) => setBulkData(e.target.value)}
-              placeholder="BREAD, 5, PALLET, 2024-02-15, From food drive&#10;MILK, 20, CASE, 2024-02-10&#10;RICE, 1000, POUNDS, 2025-01-01"
+              placeholder="GRAIN, Bread, 5, PALLET, 2024-02-15, From food drive&#10;DAIRY, Milk, 20, CASE, 2024-02-10&#10;GRAIN, Rice, 1000, POUND, 2025-01-01"
               rows="10"
               className="form-control-enhanced"
             />

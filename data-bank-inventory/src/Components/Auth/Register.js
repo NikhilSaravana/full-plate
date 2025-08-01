@@ -42,9 +42,9 @@ const Register = () => {
       await signup(formData.email, formData.password, formData.name);
     } catch (error) {
       setError(error.message || 'Failed to create an account');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   return (
