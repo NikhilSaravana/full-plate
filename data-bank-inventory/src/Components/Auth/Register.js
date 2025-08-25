@@ -52,7 +52,7 @@ const Register = () => {
       <FoodBackground count={18} />
       <div className="auth-card" style={{ background: 'rgba(255,255,255,0.92)', zIndex: 2, position: 'relative' }}>
         <div className="auth-header">
-          <h2>Food Bank Inventory</h2>
+          <h2>FullPlate</h2>
           <p>Create your account</p>
         </div>
         
