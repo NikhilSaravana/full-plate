@@ -18,7 +18,17 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
   ]);
   const [clientInfo, setClientInfo] = useState({
     clientsServed: '',
+    ageGroups: {
+      elder: 0,    // 65+ years
+      adult: 0,    // 18-64 years  
+      kid: 0       // 0-17 years
+    }
   });
+
+  // Calculate total clients from age groups
+  const calculateTotalClients = (ageGroups) => {
+    return (ageGroups.elder || 0) + (ageGroups.adult || 0) + (ageGroups.kid || 0);
+  };
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationConfig, setConfirmationConfig] = useState({});
   const [emptyItemIndices, setEmptyItemIndices] = useState([]);
@@ -83,6 +93,21 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
       return;
     }
 
+    // Validate that age groups match total clients
+    const calculatedTotal = calculateTotalClients(clientInfo.ageGroups);
+    const enteredTotal = parseInt(clientInfo.clientsServed) || 0;
+    if (calculatedTotal !== enteredTotal) {
+      setConfirmationConfig({
+        type: 'error',
+        title: 'Data Mismatch',
+        message: `Age group totals (${calculatedTotal}) don't match total clients served (${enteredTotal}). Please check your entries.`,
+        confirmText: 'OK',
+        onConfirm: () => setShowConfirmation(false)
+      });
+      setShowConfirmation(true);
+      return;
+    }
+
     // Calculate totals by MyPlate category (converting all to pounds)
     const categoryTotals = {};
     items.forEach(item => {
@@ -99,6 +124,11 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
       recipient: formData.recipient,
       notes: formData.notes,
       clientsServed: parseInt(clientInfo.clientsServed) || 0,
+      ageGroups: {
+        elder: clientInfo.ageGroups.elder,
+        adult: clientInfo.ageGroups.adult,
+        kid: clientInfo.ageGroups.kid
+      },
       items: items.map(item => ({
         ...item,
         weightInPounds: getWeightInPounds(item.quantity, item.unit, item.foodType)
@@ -107,6 +137,9 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
       totalDistributed: calculateTotalWeight(),
       timestamp: new Date().toISOString()
     };
+
+    console.log('[DISTRIBUTION] Age groups being submitted:', distributionData.ageGroups);
+    console.log('[DISTRIBUTION] Client info state:', clientInfo);
 
     if (onDataSubmit) {
       try {
@@ -134,6 +167,11 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
     });
     setClientInfo({
       clientsServed: '',
+      ageGroups: {
+        elder: 0,
+        adult: 0,
+        kid: 0
+      }
     });
 
     setConfirmationConfig({
@@ -196,15 +234,98 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
               />
             </div>
             <div className="form-field">
-              <label className="form-label-enhanced">Clients Served:</label>
+              <label className="form-label-enhanced">Total Clients Served:</label>
               <input
                 type="number"
                 className="form-control-enhanced"
                 value={clientInfo.clientsServed}
-                onChange={(e) => setClientInfo({...clientInfo, clientsServed: e.target.value})}
-                placeholder="Number of clients"
+                onChange={(e) => {
+                  const total = parseInt(e.target.value) || 0;
+                  setClientInfo({...clientInfo, clientsServed: e.target.value});
+                }}
+                placeholder="Total number of clients"
+                readOnly
+                style={{backgroundColor: '#f8f9fa', cursor: 'not-allowed'}}
               />
+              <small className="form-text text-muted">
+                This field is automatically calculated from age demographics above
+              </small>
             </div>
+          </div>
+          
+          {/* Age Group Breakdown */}
+          <div className="form-section">
+            <h3>Client Age Demographics</h3>
+            <div className="form-grid">
+              <div className="form-field">
+                <label className="form-label-enhanced">Children (0-17 years):</label>
+                <input
+                  type="number"
+                  className="form-control-enhanced"
+                  value={clientInfo.ageGroups.kid}
+                  onChange={(e) => {
+                    const kidCount = parseInt(e.target.value) || 0;
+                    const newAgeGroups = {...clientInfo.ageGroups, kid: kidCount};
+                    const totalClients = calculateTotalClients(newAgeGroups);
+                    setClientInfo({
+                      ...clientInfo, 
+                      ageGroups: newAgeGroups,
+                      clientsServed: totalClients.toString()
+                    });
+                  }}
+                  placeholder="Number of children"
+                  min="0"
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-label-enhanced">Adults (18-64 years):</label>
+                <input
+                  type="number"
+                  className="form-control-enhanced"
+                  value={clientInfo.ageGroups.adult}
+                  onChange={(e) => {
+                    const adultCount = parseInt(e.target.value) || 0;
+                    const newAgeGroups = {...clientInfo.ageGroups, adult: adultCount};
+                    const totalClients = calculateTotalClients(newAgeGroups);
+                    setClientInfo({
+                      ...clientInfo, 
+                      ageGroups: newAgeGroups,
+                      clientsServed: totalClients.toString()
+                    });
+                  }}
+                  placeholder="Number of adults"
+                  min="0"
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-label-enhanced">Elders (65+ years):</label>
+                <input
+                  type="number"
+                  className="form-control-enhanced"
+                  value={clientInfo.ageGroups.elder}
+                  onChange={(e) => {
+                    const elderCount = parseInt(e.target.value) || 0;
+                    const newAgeGroups = {...clientInfo.ageGroups, elder: elderCount};
+                    const totalClients = calculateTotalClients(newAgeGroups);
+                    setClientInfo({
+                      ...clientInfo, 
+                      ageGroups: newAgeGroups,
+                      clientsServed: totalClients.toString()
+                    });
+                  }}
+                  placeholder="Number of elders"
+                  min="0"
+                />
+              </div>
+            </div>
+            {clientInfo.clientsServed && (
+              <div className="age-group-summary">
+                <p><strong>Total Clients:</strong> {clientInfo.ageGroups.kid + clientInfo.ageGroups.adult + clientInfo.ageGroups.elder} clients</p>
+                <p className="text-muted">
+                  <small>Children: {clientInfo.ageGroups.kid} • Adults: {clientInfo.ageGroups.adult} • Elders: {clientInfo.ageGroups.elder}</small>
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -354,7 +475,18 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
               <p><strong>Total Items:</strong> {items.filter(item => item.foodType && item.quantity).length}</p>
               {clientInfo.clientsServed && (
                 <>
+                  <p><strong>Total Clients:</strong> {clientInfo.clientsServed}</p>
                   <p><strong>Average per Client:</strong> {(calculateTotalWeight() / parseFloat(clientInfo.clientsServed)).toFixed(1)} lbs</p>
+                  {(clientInfo.ageGroups.kid > 0 || clientInfo.ageGroups.adult > 0 || clientInfo.ageGroups.elder > 0) && (
+                    <div className="age-group-breakdown">
+                      <p><strong>Age Demographics:</strong></p>
+                      <ul>
+                        {clientInfo.ageGroups.kid > 0 && <li>Children (0-17): {clientInfo.ageGroups.kid}</li>}
+                        {clientInfo.ageGroups.adult > 0 && <li>Adults (18-64): {clientInfo.ageGroups.adult}</li>}
+                        {clientInfo.ageGroups.elder > 0 && <li>Elders (65+): {clientInfo.ageGroups.elder}</li>}
+                      </ul>
+                    </div>
+                  )}
                 </>
               )}
             </div>

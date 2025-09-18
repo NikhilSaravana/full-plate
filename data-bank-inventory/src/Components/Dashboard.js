@@ -6,6 +6,7 @@ import SurveyInterface from './SurveyInterface';
 import DistributionInterface from './DistributionInterface';
 import UnitConfiguration from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
+import ReportsInterface from './ReportsInterface';
 import firestoreService from '../services/firestoreService';
 import { UnitConverters } from './UnitConfiguration';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -934,6 +935,7 @@ System Health Check:
         recipient: surveyData.recipient || 'Unknown',
         totalDistributed: surveyData.totalDistributed || 0,
         clientsServed: surveyData.clientsServed || 0,
+        ageGroups: surveyData.ageGroups || { elder: 0, adult: 0, kid: 0 },
         categoryTotals: surveyData.categoryTotals || {},
         items: surveyData.items || [],
         notes: surveyData.notes || '',
@@ -944,6 +946,7 @@ System Health Check:
         const key = getDistributionHistoryKey();
         safeLocalStorageSet(key, updated);
         console.log('[SUBMIT] distribution saved:', distributionRecord);
+        console.log('[SUBMIT] ageGroups in distribution:', distributionRecord.ageGroups);
         return updated;
       });
       // Save to Firestore
@@ -1330,6 +1333,15 @@ System Health Check:
             >
               MyPlate Analysis
             </button>
+            <button 
+              className={`nav-tab ${activeTab === 'reports' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('reports');
+                setCurrentSection('reports');
+              }}
+            >
+              Reports
+            </button>
           </div>
           
           {/* Phase 7A: Enhanced Utility Controls with Tooltips */}
@@ -1411,6 +1423,11 @@ System Health Check:
               {activeTab === 'myplate' && (
                 <>
                   <span>MyPlate Analysis</span>
+                </>
+              )}
+              {activeTab === 'reports' && (
+                <>
+                  <span>Reports</span>
                 </>
               )}
             </div>
@@ -1784,6 +1801,13 @@ System Health Check:
                               </div>
                               <div className="distribution-clients">
                                 {distribution.clientsServed} clients
+                                {distribution.ageGroups && (
+                                  <div className="age-group-summary">
+                                    {distribution.ageGroups.kid > 0 && <span>👶 {distribution.ageGroups.kid}</span>}
+                                    {distribution.ageGroups.adult > 0 && <span>👤 {distribution.ageGroups.adult}</span>}
+                                    {distribution.ageGroups.elder > 0 && <span>👴 {distribution.ageGroups.elder}</span>}
+                                  </div>
+                                )}
                               </div>
                               <div className="distribution-categories">
                                 {Object.keys(distribution.categoryTotals || {}).length} categories
@@ -1819,6 +1843,12 @@ System Health Check:
             targetCapacity={targetCapacity}
             onUpdateTargetCapacity={handleUpdateTargetCapacity}
             unitConfig={unitConfig}
+          />
+        )}
+
+        {activeTab === 'reports' && (
+          <ReportsInterface 
+            distributionHistory={distributionHistory}
           />
         )}
       </main>
