@@ -207,6 +207,7 @@ class FirestoreService {
         ...doc.data()
       }));
       console.log('Loaded user distributions from Firestore:', data);
+      console.log('Sample distribution ageGroups:', data[0]?.ageGroups);
       return data;
     } catch (error) {
       console.error('Error getting user distributions:', error);
