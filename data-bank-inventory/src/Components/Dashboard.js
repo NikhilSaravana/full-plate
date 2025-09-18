@@ -1222,10 +1222,10 @@ System Health Check:
         <header className="dashboard-header">
           <div className="header-content">
             <div className="header-left">
-          <h1>Food Bank Inventory Manager</h1>
+          <h1>FullPlate</h1>
           {isFirstTime && (
             <div className="help-text-prominent">
-              <strong>Welcome to your Food Bank Inventory Manager!</strong>
+              <strong>Welcome to FullPlate!</strong>
               <br />
               Get started by clicking the "Food Intake" tab above to record your current food inventory. 
               This system will help you track food donations, manage distributions, and ensure nutritional balance.

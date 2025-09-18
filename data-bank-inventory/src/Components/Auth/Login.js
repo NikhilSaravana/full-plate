@@ -46,13 +46,13 @@ const Login = () => {
       <FoodBackground count={18} />
       <div className="auth-card" style={{ background: 'rgba(255,255,255,0.92)', zIndex: 2, position: 'relative' }}>
         <div className="auth-header">
-          <h2>Food Bank Inventory</h2>
-          <p>Sign in to your account</p>
-          {isFirebaseConfigured && (
+          <h2>FullPlate</h2>
+          <p>Sign in to your account below</p>
+          {/* {isFirebaseConfigured && (
             <div className="firebase-status">
               ✅ Connected to Firebase Project
             </div>
-          )}
+          )} */}
         </div>
         
         <form onSubmit={handleSubmit} className="auth-form">
