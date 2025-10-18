@@ -52,6 +52,8 @@ const DEFAULT_UNIT_CONFIGS = {
   }
 };
 
+
+
 const Dashboard = () => {
   const { currentUser, logout, getUserProfile } = useAuth();
 
@@ -65,6 +67,9 @@ const Dashboard = () => {
     'PRODUCE': 0,
     'MISC': 0
   });
+
+  const [successMessage, setSuccessMessage] = useState('');
+
 
   const [activeTab, setActiveTab] = useState('overview');
   const [activeOverviewSection, setActiveOverviewSection] = useState('dashboard');
@@ -937,6 +942,16 @@ System Health Check:
           debouncedSaveInventory(updated);
         }
       }
+
+      const successMsg = surveyData.type === 'DISTRIBUTION' 
+      ? 'Distribution recorded successfully!' 
+      : 'Inventory updated successfully!';
+      setSuccessMessage(successMsg);
+      
+      // Clear the success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
       return updated;
     });
 
@@ -1461,6 +1476,7 @@ System Health Check:
                   <span>Reports</span>
                 </>
               )}
+              
             </div>
           </div>
 
@@ -1857,14 +1873,14 @@ System Health Check:
 
         {activeTab === 'dataentry' && (
           <div className="data-entry-tab">
-            <SurveyInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} />
+            <SurveyInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} successMessage={successMessage} />
             {/* Removed: Distribution log from Food Intake tab */}
           </div>
         )}
 
         {activeTab === 'distribution' && (
           <div className="distribution-tab">
-            <DistributionInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} />
+            <DistributionInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} successMessage={successMessage}/>
           </div>
         )}
 
@@ -1907,6 +1923,7 @@ System Health Check:
         message={confirmationDialog.message}
         type={confirmationDialog.type}
       />
+      
     </div>
     </>
   );

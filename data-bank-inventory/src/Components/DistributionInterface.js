@@ -7,7 +7,7 @@ import ConfirmationDialog from './ConfirmationDialog';
 // High-level categories shown in the dropdown instead of the full 30+ list
 export const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
 
-const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
+const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
     recipient: '',
@@ -506,11 +506,22 @@ const DistributionInterface = ({ onDataSubmit, unitConfig }) => {
           </div>
         </div>
 
-        <div className="form-actions">
-          <button onClick={submitDistribution} className="btn btn-primary">
-            Record Distribution
+        <div className="form-actions" style={{ marginTop: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px' }}>
+          {successMessage && (
+            <span style={{ 
+              color: '#28a745', 
+              fontWeight: 'bold',
+              fontSize: '16px',
+              animation: 'fadeIn 0.3s ease-in'
+            }}>
+              ✓ {successMessage}
+            </span>
+          )}
+          <button onClick={submitDistribution} className="btn btn-primary btn-large">
+            Submit Survey
           </button>
         </div>
+
       </div>
       
       {showConfirmation && (
