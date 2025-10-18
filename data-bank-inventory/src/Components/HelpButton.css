@@ -1,0 +1,318 @@
+.help-button {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2c5aa0 0%, #1e3a72 100%);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(44, 90, 160, 0.3);
+  transition: all 0.3s ease;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.help-button:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(44, 90, 160, 0.4);
+  background: linear-gradient(135deg, #1e3a72 0%, #2c5aa0 100%);
+}
+
+.help-button:active {
+  transform: translateY(0) scale(0.95);
+}
+
+.help-icon {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+/* Help Modal Overlay */
+.help-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Help Modal */
+.help-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease-out;
+  position: relative;
+  border: 1px solid #e9ecef;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Help Header */
+.help-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 16px 24px;
+  border-bottom: 1px solid #e9ecef;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 16px 16px 0 0;
+}
+
+.help-header h3 {
+  margin: 0;
+  color: #2c5aa0;
+  font-size: 1.4em;
+  font-weight: 600;
+}
+
+.help-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.help-close:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+/* Help Content */
+.help-content {
+  padding: 24px;
+}
+
+.help-content p {
+  margin: 0 0 20px 0;
+  color: #495057;
+  line-height: 1.6;
+  font-size: 1em;
+}
+
+/* Contact Info */
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.email-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.email-section label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #2c5aa0;
+  font-size: 1.1em;
+}
+
+.email-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 2px solid #e9ecef;
+  transition: border-color 0.2s ease;
+}
+
+.email-container:hover {
+  border-color: #2c5aa0;
+}
+
+.email-address {
+  flex: 1;
+  font-size: 1.1em;
+  color: #2c5aa0;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.copy-btn {
+  background: #2c5aa0;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+}
+
+.copy-btn:hover {
+  background: #1e3a72;
+  transform: scale(1.05);
+}
+
+.copy-btn:active {
+  transform: scale(0.95);
+}
+
+
+@media (max-width: 768px) {
+  .help-button {
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+
+  .help-icon {
+    font-size: 22px;
+  }
+
+  .help-modal {
+    width: 95%;
+    margin: 20px;
+  }
+
+  .help-header {
+    padding: 20px 20px 16px 20px;
+  }
+
+  .help-content {
+    padding: 20px;
+  }
+
+  .email-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .copy-btn {
+    align-self: flex-end;
+    width: fit-content;
+  }
+}
+
+@media (max-width: 480px) {
+  .help-button {
+    bottom: 15px;
+    right: 15px;
+    width: 45px;
+    height: 45px;
+    font-size: 18px;
+  }
+
+  .help-icon {
+    font-size: 20px;
+  }
+
+  .help-modal {
+    width: 98%;
+    margin: 10px;
+  }
+
+  .help-header h3 {
+    font-size: 1.2em;
+  }
+
+  .email-address {
+    font-size: 1em;
+    word-break: break-all;
+  }
+}
+
+/* Animation for button pulse effect */
+.help-button::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2c5aa0 0%, #1e3a72 100%);
+  z-index: -1;
+  opacity: 0;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+/* Accessibility improvements */
+.help-button:focus {
+  outline: 3px solid rgba(44, 90, 160, 0.3);
+  outline-offset: 2px;
+}
+
+.help-close:focus {
+  outline: 2px solid #2c5aa0;
+  outline-offset: 2px;
+}
+
+.copy-btn:focus {
+  outline: 2px solid #2c5aa0;
+  outline-offset: 2px;
+}

@@ -55,8 +55,10 @@ const DEFAULT_UNIT_CONFIGS = {
   }
 };
 
+
+
 const Dashboard = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, getUserProfile } = useAuth();
   const { t } = useLanguage();
 
   // Real inventory state that starts empty and gets populated by user data
@@ -70,11 +72,34 @@ const Dashboard = () => {
     'MISC': 0
   });
 
+  const [successMessage, setSuccessMessage] = useState('');
+
+
   const [activeTab, setActiveTab] = useState('overview');
   const [activeOverviewSection, setActiveOverviewSection] = useState('dashboard');
   const [recentActivity, setRecentActivity] = useState([]);
   const [isFirstTime, setIsFirstTime] = useState(true);
   const [autoSaveStatus, setAutoSaveStatus] = useState('');
+  const [userProfile, setUserProfile] = useState(null);
+  
+  // Debouncing for inventory saves to prevent excessive Firestore writes
+  const [inventorySaveTimeout, setInventorySaveTimeout] = useState(null);
+  
+  // Debounced inventory save function - only saves after 2 seconds of no changes
+  const debouncedSaveInventory = (inventoryData) => {
+    if (inventorySaveTimeout) {
+      clearTimeout(inventorySaveTimeout);
+    }
+    
+    const timeout = setTimeout(() => {
+      if (currentUser) {
+        firestoreService.saveInventory(currentUser.uid, inventoryData)
+          .catch(err => console.warn('Failed to save inventory to Firestore:', err));
+      }
+    }, 2000); // 2 second delay
+    
+    setInventorySaveTimeout(timeout);
+  };
 
   // Enhanced Distribution Tracking
   const [distributionHistory, setDistributionHistory] = useState([]);
@@ -166,6 +191,34 @@ const Dashboard = () => {
   };
 
 
+
+  // Load user profile data from Firestore on login (cached to avoid repeated reads)
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    // Check if we already have the profile data to avoid unnecessary reads
+    if (userProfile && userProfile.email === currentUser.email) {
+      return; // Already have the correct profile data
+    }
+    
+    // Try to load from localStorage first to avoid Firestore read
+    const cachedProfile = safeLocalStorageGet('userProfile', null);
+    if (cachedProfile && cachedProfile.email === currentUser.email) {
+      setUserProfile(cachedProfile);
+      return;
+    }
+    
+    // Only read from Firestore if not cached
+    getUserProfile().then(profile => {
+      if (profile) {
+        setUserProfile(profile);
+        // Cache the profile data
+        safeLocalStorageSet('userProfile', profile);
+      }
+    }).catch(error => {
+      console.error('Error loading user profile:', error);
+    });
+  }, [currentUser]); // Removed getUserProfile from dependencies to prevent re-runs
 
   // Load today's metrics from Firestore on login
   useEffect(() => {
@@ -501,7 +554,7 @@ const Dashboard = () => {
     if (!currentUser) return;
     setIsLoadingDistributions(true);
     try {
-      const history = await firestoreService.getUserDistributions(currentUser.uid, 1000);
+      const history = await firestoreService.getUserDistributions(currentUser.uid, 100); // Reduced from 1000 to 100
       if (Array.isArray(history) && history.length > 0) {
         setDistributionHistory(history);
         safeLocalStorageSet(getDistributionHistoryKey(), history);
@@ -873,32 +926,8 @@ System Health Check:
     console.log('[SAVE] distributionHistory to localStorage:', distributionHistory.length, 'records');
   }, [distributionHistory, currentUser, isLoadingDistributions]);
 
-  // On login, load from Firestore, but only overwrite if Firestore has data
-  useEffect(() => {
-    if (currentUser && connectionStatus.connected) {
-      firestoreService.getUserDistributions(currentUser.uid, 1000)
-        .then(data => {
-          if (Array.isArray(data) && data.length > 0) {
-            setDistributionHistory(data);
-            const key = getDistributionHistoryKey();
-            safeLocalStorageSet(key, data);
-            console.log('[FIRESTORE] Loaded and saved to localStorage:', data.length, 'records');
-          } else if (Array.isArray(data?.data) && data.data.length > 0) {
-            setDistributionHistory(data.data);
-            const key = getDistributionHistoryKey();
-            safeLocalStorageSet(key, data.data);
-            console.log('[FIRESTORE] Loaded and saved to localStorage:', data.data.length, 'records');
-          } else {
-            // Do not overwrite local data if Firestore is empty
-            console.log('[FIRESTORE] No distribution data in Firestore, keeping local data');
-          }
-        })
-        .catch(error => {
-          console.error('Error loading distribution history from Firestore:', error);
-          // Do not clear local data on error
-        });
-    }
-  }, [currentUser, connectionStatus.connected]);
+  // Note: Distribution loading is handled by the manual load function above
+  // Removed duplicate loading to save quota
 
   // When a distribution is submitted, always update state and Firestore
   const handleSurveySubmit = async (surveyData) => {
@@ -911,16 +940,26 @@ System Health Check:
           updated[category] = Math.max(0, (updated[category] || 0) - weight);
         });
         if (currentUser) {
-          firestoreService.saveInventory(currentUser.uid, updated);
+          debouncedSaveInventory(updated);
         }
       } else if (surveyData.type === 'SINGLE' || surveyData.type === 'BULK') {
         Object.entries(surveyData.categoryTotals).forEach(([category, weight]) => {
           updated[category] = (updated[category] || 0) + weight;
         });
         if (currentUser) {
-          firestoreService.saveInventory(currentUser.uid, updated);
+          debouncedSaveInventory(updated);
         }
       }
+
+      const successMsg = surveyData.type === 'DISTRIBUTION' 
+      ? 'Distribution recorded successfully!' 
+      : 'Inventory updated successfully!';
+      setSuccessMessage(successMsg);
+      
+      // Clear the success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
       return updated;
     });
 
@@ -1298,9 +1337,16 @@ System Health Check:
                 </div>
               </div>
               <div className="user-profile">
-                <span className="user-name">
-                  {currentUser?.displayName || currentUser?.email || 'User'}
-                </span>
+                <div className="user-info">
+                  <span className="user-name">
+                    {userProfile?.name || currentUser?.displayName || currentUser?.email || 'User'}
+                  </span>
+                  {userProfile?.organization && (
+                    <span className="user-organization">
+                      {userProfile.organization}
+                    </span>
+                  )}
+                </div>
                 <button onClick={handleLogout} className="btn btn-light" style={{ minHeight: '36px', padding: '8px 16px' }}>
                   {t('header.sign-out')}
                 </button>
@@ -1477,6 +1523,7 @@ System Health Check:
                   <span>{t('nav.reports')}</span>
                 </>
               )}
+              
             </div>
           </div>
 
@@ -1873,14 +1920,14 @@ System Health Check:
 
         {activeTab === 'dataentry' && (
           <div className="data-entry-tab">
-            <SurveyInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} />
+            <SurveyInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} successMessage={successMessage} />
             {/* Removed: Distribution log from Food Intake tab */}
           </div>
         )}
 
         {activeTab === 'distribution' && (
           <div className="distribution-tab">
-            <DistributionInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} />
+            <DistributionInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} successMessage={successMessage}/>
           </div>
         )}
 

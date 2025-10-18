@@ -4004,11 +4004,46 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
 .user-name {
   color: #fff !important;
   font-weight: 700;
   font-size: 1em;
   text-shadow: 0 1px 4px rgba(44,90,160,0.5);
+}
+
+.user-organization {
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-weight: 500;
+  font-size: 0.85em;
+  text-shadow: 0 1px 2px rgba(44,90,160,0.3);
+}
+
+/* Success Message Styles */
+.success-message {
+  text-align: center;
+  font-size: 2.5em;
+  font-weight: bold;
+  color: #28a745;
+  margin: 20px 0;
+  padding: 20px;
+  background: rgba(40, 167, 69, 0.1);
+  border: 2px solid #28a745;
+  border-radius: 12px;
+  animation: fadeInOut 5s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: scale(0.8); }
+  20% { opacity: 1; transform: scale(1.05); }
+  80% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.8); }
 }
 
 /* --- Sync Status Indicator --- */

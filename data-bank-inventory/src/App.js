@@ -6,6 +6,7 @@ import Dashboard from './Components/Dashboard';
 import Login from './Components/Auth/Login';
 import Register from './Components/Auth/Register';
 import ForgotPassword from './Components/Auth/ForgotPassword';
+import HelpButton from './Components/HelpButton';
 import './App.css';
 
 // Protected Route wrapper
@@ -68,6 +69,7 @@ function App() {
       <LanguageProvider>
         <AuthProvider>
           <AppRoutes />
+          <HelpButton />
         </AuthProvider>
       </LanguageProvider>
     </div>

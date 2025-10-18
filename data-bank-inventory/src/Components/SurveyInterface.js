@@ -6,7 +6,7 @@ import ConfirmationDialog from './ConfirmationDialog';
 // High-level categories for simplified selection
 export const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
 
-const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
+const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
   const [surveyMode, setSurveyMode] = useState('SINGLE'); // SINGLE, BULK, DISTRIBUTION
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
@@ -462,11 +462,22 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
           </div>
         )}
 
-        <div className="form-actions" style={{ marginTop: '32px', textAlign: 'center' }}>
+        <div className="form-actions" style={{ marginTop: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px' }}>
+          {successMessage && (
+            <span style={{ 
+              color: '#28a745', 
+              fontWeight: 'bold',
+              fontSize: '16px',
+              animation: 'fadeIn 0.3s ease-in'
+            }}>
+              ✓ {successMessage}
+            </span>
+          )}
           <button onClick={submitSurvey} className="btn btn-primary btn-large">
             Submit Survey
           </button>
         </div>
+
       </div>
       
       {showConfirmation && (
@@ -480,6 +491,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig }) => {
           onCancel={confirmationConfig.onCancel}
         />
       )}
+      
     </div>
   );
 };
