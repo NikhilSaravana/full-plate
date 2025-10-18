@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth } from '../firebase/config';
+import firestoreService from '../services/firestoreService';
 
 const AuthContext = createContext();
 
@@ -21,7 +22,7 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState('');
 
   // Sign up function
-  async function signup(email, password, displayName) {
+  async function signup(email, password, displayName, organization = '') {
     try {
       setError('');
       const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -32,6 +33,18 @@ export function AuthProvider({ children }) {
           displayName: displayName
         });
       }
+      
+      // Create user profile in Firestore with all collected data
+      const userProfileData = {
+        name: displayName,
+        email: email,
+        organization: organization,
+        createdAt: new Date(),
+        lastLoginAt: new Date(),
+        isActive: true
+      };
+      
+      await firestoreService.createUserProfile(result.user.uid, userProfileData);
       
       return result;
     } catch (error) {
@@ -44,7 +57,28 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     try {
       setError('');
-      return await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Update last login time in Firestore (but only once per day to save quota)
+      if (result.user) {
+        try {
+          const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+          const lastLoginDate = localStorage.getItem(`lastLoginDate_${result.user.uid}`);
+          
+          // Only update if we haven't updated today already
+          if (lastLoginDate !== today) {
+            await firestoreService.updateUserProfile(result.user.uid, {
+              lastLoginAt: new Date()
+            });
+            localStorage.setItem(`lastLoginDate_${result.user.uid}`, today);
+          }
+        } catch (profileError) {
+          console.warn('Could not update last login time:', profileError);
+          // Don't throw error for profile update failure
+        }
+      }
+      
+      return result;
     } catch (error) {
       setError(error.message);
       throw error;
@@ -89,6 +123,17 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
+  // Get user profile data from Firestore
+  async function getUserProfile() {
+    if (!currentUser) return null;
+    try {
+      return await firestoreService.getUserProfile(currentUser.uid);
+    } catch (error) {
+      console.error('Error getting user profile:', error);
+      return null;
+    }
+  }
+
   const value = {
     currentUser,
     login,
@@ -96,6 +141,7 @@ export function AuthProvider({ children }) {
     logout,
     resetPassword,
     updateUserProfile,
+    getUserProfile,
     error,
     setError
   };
