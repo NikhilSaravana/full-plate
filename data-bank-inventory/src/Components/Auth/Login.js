@@ -47,6 +47,7 @@ const Login = () => {
       <div className="auth-card" style={{ background: 'rgba(255,255,255,0.92)', zIndex: 2, position: 'relative' }}>
         <div className="auth-header">
           <h2>FullPlate</h2>
+          <h3>Inventory Management Tool</h3>
           <p>Sign in to your account below</p>
           {/* {isFirebaseConfigured && (
             <div className="firebase-status">
