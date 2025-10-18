@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { getMyPlateCategory } from './FoodCategoryMapper';
 import { getUnitConverters } from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // High-level categories for simplified selection
 export const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
 
 const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
+  const { t } = useLanguage();
   const [surveyMode, setSurveyMode] = useState('SINGLE'); // SINGLE, BULK, DISTRIBUTION
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
@@ -72,9 +74,9 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
     } catch (error) {
       setConfirmationConfig({
         type: 'error',
-        title: 'Parsing Error',
-        message: 'Error parsing bulk data. Please check the format and try again. Make sure each line follows: Category, Product, Quantity, Unit, Expiration Date, Notes',
-        confirmText: 'OK',
+        title: t('survey.parsing-error'),
+        message: t('survey.parsing-error-message'),
+        confirmText: t('ui.ok'),
         onConfirm: () => setShowConfirmation(false)
       });
       setShowConfirmation(true);
@@ -89,9 +91,9 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
     if (surveyMode === 'SINGLE' && emptyIndices.length > 0) {
       setConfirmationConfig({
         type: 'error',
-        title: 'Missing Information',
-        message: 'Please fill in all required fields (Food Type and Quantity) or remove unused line items before submitting the survey. Empty lines are highlighted.',
-        confirmText: 'OK',
+        title: t('survey.missing-info'),
+        message: t('survey.missing-info-message'),
+        confirmText: t('ui.ok'),
         onConfirm: () => setShowConfirmation(false)
       });
       setShowConfirmation(true);
@@ -216,19 +218,19 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
   return (
     <div className="survey-interface">
       <div className="survey-header">
-        <h2>Data Entry Survey</h2>
+        <h2>{t('survey.title')}</h2>
         <div className="nav-with-icons" style={{ marginBottom: '24px' }}>
           <button
             className={`nav-tab ${surveyMode === 'SINGLE' ? 'active' : ''}`}
             onClick={() => setSurveyMode('SINGLE')}
           >
-            Single Entry
+            {t('subtabs.single-entry')}
           </button>
           <button
             className={`nav-tab ${surveyMode === 'BULK' ? 'active' : ''}`}
             onClick={() => setSurveyMode('BULK')}
           >
-            Bulk Import
+            {t('subtabs.bulk-import')}
           </button>
         </div>
       </div>
@@ -236,10 +238,10 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
       <div className="survey-form">
         {/* Common Form Fields */}
         <div className="form-section">
-          <h3>General Information</h3>
+          <h3>{t('survey.general-information')}</h3>
           <div className="form-grid">
             <div className="form-field">
-              <label className="form-label-enhanced">Date:</label>
+              <label className="form-label-enhanced">{t('form.date')}:</label>
               <input
                 type="date"
                 className="form-control-enhanced"
@@ -248,28 +250,28 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
               />
             </div>
             <div className="form-field">
-              <label className="form-label-enhanced">Source:</label>
+              <label className="form-label-enhanced">{t('inventory.source')}:</label>
               <select
                 className="form-control-enhanced"
                 value={formData.source}
                 onChange={(e) => setFormData({...formData, source: e.target.value})}
               >
-                <option value="Direct Donation">Direct Donation</option>
-                <option value="NTFB AE">NTFB AE</option>
-                <option value="Local Farm">Local Farm</option>
-                <option value="Food Drive">Food Drive</option>
-                <option value="Purchase">Purchase</option>
-                <option value="Government">Government Program</option>
+                <option value="Direct Donation">{t('source.direct-donation')}</option>
+                <option value="NTFB AE">{t('source.ntfb-ae')}</option>
+                <option value="Local Farm">{t('source.local-farm')}</option>
+                <option value="Food Drive">{t('source.food-drive')}</option>
+                <option value="Purchase">{t('source.purchase')}</option>
+                <option value="Government">{t('source.government')}</option>
               </select>
             </div>
           </div>
           <div className="form-field">
-            <label className="form-label-enhanced">Notes:</label>
+            <label className="form-label-enhanced">{t('inventory.notes')}:</label>
             <textarea
               className="form-control-enhanced"
               value={formData.notes}
               onChange={(e) => setFormData({...formData, notes: e.target.value})}
-              placeholder="Additional notes or comments..."
+              placeholder={t('survey.additional-notes')}
               rows="3"
             />
           </div>
@@ -278,10 +280,10 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
         {/* Single Entry Mode */}
         {surveyMode === 'SINGLE' && (
           <div className="form-section">
-            <h3>Inventory Items</h3>
+            <h3>{t('survey.inventory-items')}</h3>
             <div className="quick-add-section">
               <div className="quick-add-header">
-                <span className="quick-add-label">Quick Add Common Items:</span>
+                <span className="quick-add-label">{t('survey.quick-add-common')}</span>
               </div>
               <div className="quick-add-buttons">
                 {getQuickAddButtons().map(item => (
@@ -321,41 +323,41 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
                 <div className="item-main-row">
                   <div className="item-inputs">
                     <div className="input-group">
-                      <label className="form-label-enhanced">Category</label>
+                      <label className="form-label-enhanced">{t('form.category')}</label>
                       <select
                         value={item.foodType}
                         onChange={(e) => updateItem(index, 'foodType', e.target.value)}
                         className="form-control-enhanced"
                       >
-                        <option value="">Select Category</option>
+                        <option value="">{t('survey.select-category')}</option>
                         {getFoodTypeOptions().map(option => (
                           <option key={option} value={option}>{option}</option>
                         ))}
                       </select>
                     </div>
                     <div className="input-group">
-                      <label className="form-label-enhanced">Product</label>
+                      <label className="form-label-enhanced">{t('form.product')}</label>
                       <input
                         type="text"
-                        placeholder="e.g., Apples, Yogurt"
+                        placeholder={t('survey.product-placeholder')}
                         className="form-control-enhanced"
                         value={item.product}
                         onChange={(e) => updateItem(index, 'product', e.target.value)}
                       />
                     </div>
                     <div className="input-group">
-                      <label className="form-label-enhanced">Quantity</label>
+                      <label className="form-label-enhanced">{t('form.quantity')}</label>
                       <input
                         type="number"
                         step="0.1"
-                        placeholder="Quantity"
+                        placeholder={t('survey.quantity-placeholder')}
                         className="form-control-enhanced"
                         value={item.quantity}
                         onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                       />
                     </div>
                     <div className="input-group">
-                      <label className="form-label-enhanced">Unit</label>
+                      <label className="form-label-enhanced">{t('form.unit')}</label>
                       <select
                         value={item.unit}
                         onChange={(e) => updateItem(index, 'unit', e.target.value)}
@@ -371,27 +373,27 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
                       </select>
                     </div>
                     <div className="input-group">
-                      <label className="form-label-enhanced">Expiration</label>
+                      <label className="form-label-enhanced">{t('form.expiration')}</label>
                       <input
                         type="date"
-                        placeholder="Expiration"
+                        placeholder={t('form.expiration')}
                         className="form-control-enhanced"
                         value={item.expirationDate}
                         onChange={(e) => updateItem(index, 'expirationDate', e.target.value)}
                       />
                     </div>
                     <div className="input-group">
-                      <label className="form-label-enhanced">Category</label>
+                      <label className="form-label-enhanced">{t('form.category')}</label>
                       <div className="category-display">
-                        {item.foodType || 'Select category first'}
+                        {item.foodType || t('survey.select-category-first')}
                       </div>
                     </div>
                     <div className="input-group">
-                      <label className="form-label-enhanced">Weight</label>
+                      <label className="form-label-enhanced">{t('form.weight')}</label>
                       <div className="weight-display">
                         {item.quantity && item.foodType ? 
                           getUnitDisplayWeight(item.quantity, item.unit, item.foodType) : 
-                          'Enter quantity'
+                          t('survey.enter-quantity')
                         }
                       </div>
                     </div>
@@ -401,19 +403,19 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
                       <button
                         onClick={() => removeItem(index)}
                         className="btn btn-danger remove-btn"
-                        title="Remove this item"
+                        title={t('survey.remove-item')}
                       >
-                        Remove
+                        {t('survey.remove-item')}
                       </button>
                     )}
                   </div>
                 </div>
                 <div className="item-notes-row">
                   <div className="input-group notes-input-group">
-                    <label className="form-label-enhanced">Notes (Optional)</label>
+                    <label className="form-label-enhanced">{t('inventory.notes')} ({t('ui.optional')})</label>
                     <input
                       type="text"
-                      placeholder="Additional notes about this item..."
+                      placeholder={t('survey.additional-notes')}
                       className="form-control-enhanced"
                       value={item.notes}
                       onChange={(e) => updateItem(index, 'notes', e.target.value)}
@@ -424,13 +426,13 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
             ))}
 
             <button onClick={addItem} className="btn btn-primary" style={{ marginTop: '16px' }}>
-              Add Another Item
+              + {t('survey.add-item')}
             </button>
 
             {items.length > 0 && (
               <div className="entry-summary">
-                <p><strong>Total Weight:</strong> {calculateTotalWeight().toFixed(1)} lbs</p>
-                <p><strong>Total Items:</strong> {items.filter(item => item.foodType && item.quantity).length}</p>
+                <p><strong>{t('survey.total-weight')}:</strong> {calculateTotalWeight().toFixed(1)} {t('units.lbs')}</p>
+                <p><strong>{t('inventory.total-items')}:</strong> {items.filter(item => item.foodType && item.quantity).length}</p>
               </div>
             )}
           </div>
@@ -439,15 +441,15 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
         {/* Bulk Import Mode */}
         {surveyMode === 'BULK' && (
           <div className="form-section">
-            <h3>Bulk Import</h3>
+            <h3>{t('survey.bulk-import')}</h3>
             <p className="help-text">
-              Enter data in CSV format: Category, Product, Quantity, Unit, Expiration Date, Notes (optional)
+              {t('survey.bulk-instructions')}
               <br />
-              Example: GRAIN, Bread, 5, PALLET, 2024-02-15, From food drive
+              {t('survey.bulk-format')}
               <br />
-              Categories: {MAIN_FOOD_CATEGORIES.join(', ')}
+              {t('survey.categories')}: {MAIN_FOOD_CATEGORIES.join(', ')}
               <br />
-              Available units: {unitConverters.getAvailableUnits().map(u => u.abbreviation).join(', ')}
+              {t('survey.available-units')}: {unitConverters.getAvailableUnits().map(u => u.abbreviation).join(', ')}
             </p>
             <textarea
               value={bulkData}
@@ -457,7 +459,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
               className="form-control-enhanced"
             />
             <button onClick={handleBulkDataParse} className="btn btn-primary" style={{ marginTop: '16px' }}>
-              Parse Data
+              {t('survey.bulk-parse')}
             </button>
           </div>
         )}
@@ -474,7 +476,7 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
             </span>
           )}
           <button onClick={submitSurvey} className="btn btn-primary btn-large">
-            Submit Survey
+            {t('survey.submit')}
           </button>
         </div>
 

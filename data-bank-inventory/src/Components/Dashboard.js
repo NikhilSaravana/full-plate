@@ -1531,13 +1531,13 @@ System Health Check:
             <div className="overview-tab">
               {getTotalInventory() === 0 ? (
                 <div className="empty-state">
-                  <h2>No Inventory Data Yet</h2>
-                  <p>Get started by adding your current inventory using the "Data Entry" tab.</p>
+                  <h2>{t('empty.no-inventory')}</h2>
+                  <p>{t('empty.no-inventory-desc')}</p>
                   <button 
                     className="btn btn-primary btn-large"
                     onClick={() => setActiveTab('dataentry')}
                   >
-                    Start Adding Inventory
+                    {t('empty.start-adding')}
                   </button>
                 </div>
               ) : (
@@ -1548,31 +1548,31 @@ System Health Check:
                       className={`nav-tab ${activeOverviewSection === 'dashboard' ? 'active' : ''}`}
                       onClick={() => setActiveOverviewSection('dashboard')}
                     >
-                      Dashboard
+                      {t('nav.overview')}
                     </button>
                     <button 
                       className={`nav-tab ${activeOverviewSection === 'inventory' ? 'active' : ''}`}
                       onClick={() => setActiveOverviewSection('inventory')}
                     >
-                      Inventory
+                      {t('subtabs.inventory-management')}
                     </button>
                     <button 
                       className={`nav-tab ${activeOverviewSection === 'units' ? 'active' : ''}`}
                       onClick={() => setActiveOverviewSection('units')}
                     >
-                      Units
+                      {t('subtabs.unit-configuration')}
                     </button>
                     <button 
                       className={`nav-tab ${activeOverviewSection === 'reports' ? 'active' : ''}`}
                       onClick={() => setActiveOverviewSection('reports')}
                     >
-                      Analytics
+                      {t('subtabs.analytics')}
                     </button>
                     <button 
                       className={`nav-tab ${activeOverviewSection === 'distributions' ? 'active' : ''}`}
                       onClick={() => setActiveOverviewSection('distributions')}
                     >
-                      Distributions
+                      {t('subtabs.distribution-history')}
                     </button>
                   </div>
 
@@ -1582,9 +1582,9 @@ System Health Check:
                       <div className="overview-grid">
                         <div className="overview-section">
                           <div className="section-header">
-                            <h2>Current Inventory Distribution</h2>
+                            <h2>{t('dashboard.current-inventory')}</h2>
                             <div className="flex items-center space-x-2">
-                              <span className="text-sm font-medium text-gray-700">Show in:</span>
+                              <span className="text-sm font-medium text-gray-700">{t('dashboard.show-in')}</span>
                               <div className="flex rounded-md shadow-sm">
                                 <button
                                   onClick={() => setOrderingUnit('POUND')}
@@ -1594,7 +1594,7 @@ System Health Check:
                                       : 'bg-white text-gray-700 hover:bg-gray-50'
                                   }`}
                                 >
-                                  Pounds
+                                  {t('dashboard.pounds')}
                                 </button>
                                 <button
                                   onClick={() => setOrderingUnit('CASE')}
@@ -1604,7 +1604,7 @@ System Health Check:
                                       : 'bg-white text-gray-700 hover:bg-gray-50'
                                   }`}
                                 >
-                                  Cases
+                                  {t('dashboard.cases')}
                                 </button>
                                 <button
                                   onClick={() => setOrderingUnit('PALLET')}
@@ -1614,7 +1614,7 @@ System Health Check:
                                       : 'bg-white text-gray-700 hover:bg-gray-50'
                                   }`}
                                 >
-                                  Pallets
+                                  {t('dashboard.pallets')}
                                 </button>
                               </div>
                             </div>
@@ -1671,12 +1671,12 @@ System Health Check:
                         </div>
 
                         <div className="overview-section">
-                          <h2>Critical Alerts & Warnings</h2>
+                          <h2>{t('dashboard.critical-alerts-warnings')}</h2>
                           <div className="alerts-feed">
                             {combinedAlerts.length === 0 ? (
                               <div className="no-alerts">
-                                <p>No critical alerts at this time</p>
-                                <p>All systems are operating within normal parameters.</p>
+                                <p>{t('dashboard.no-alerts')}</p>
+                                <p>{t('dashboard.no-alerts-desc')}</p>
                               </div>
                             ) : (
                               combinedAlerts.slice(0, 8).map((alert, index) => (
@@ -1699,42 +1699,42 @@ System Health Check:
                       {/* Second row with Quick Actions and Recent Distributions */}
                       <div className="overview-grid-compact" style={{ marginTop: '15px' }}>
                         <div className="overview-section">
-                          <h2>Quick Actions</h2>
+                          <h2>{t('dashboard.quick-actions')}</h2>
                           <div className="quick-actions">
                             <button 
                               className="btn btn-primary"
                               onClick={() => setActiveTab('dataentry')}
                             >
-                              Add Inventory
+                              {t('dashboard.add-inventory')}
                             </button>
                             <button 
                               className="btn btn-secondary"
                               onClick={() => setActiveTab('myplate')}
                             >
-                              Check MyPlate
+                              {t('dashboard.check-myplate')}
                             </button>
                             <button 
                               className="btn btn-secondary"
                               onClick={() => setActiveOverviewSection('inventory')}
                             >
-                              Manage Inventory
+                              {t('dashboard.manage-inventory')}
                             </button>
                             <button 
                               className="btn btn-danger"
                               onClick={resetAllData}
                             >
-                              Reset All Data
+                              {t('dashboard.reset-all-data')}
                             </button>
                           </div>
                         </div>
 
                         <div className="overview-section">
-                          <h2>Recent Distributions</h2>
+                          <h2>{t('dashboard.recent-distributions')}</h2>
                           <div className="distribution-feed">
                             {distributionHistory.length === 0 ? (
                               <div className="no-distributions">
-                                <p>No distributions recorded yet</p>
-                                <p>Start recording distributions to track outgoing food.</p>
+                                <p>{t('dashboard.no-distributions')}</p>
+                                <p>{t('dashboard.no-distributions-desc')}</p>
                               </div>
                             ) : (
                               distributionHistory.slice().sort(sortDistributionsByRecency).slice(0, 5).map((distribution, index) => (
@@ -1742,14 +1742,14 @@ System Health Check:
                                   <div className="distribution-icon">OUT</div>
                                   <div className="distribution-content">
                                     <p className="distribution-message">
-                                      {distribution.totalDistributed?.toFixed(1)} lbs to {distribution.recipient}
+                                      {distribution.totalDistributed?.toFixed(1)} {t('units.lbs')} to {distribution.recipient}
                                     </p>
                                     <p className="distribution-details">
-                                      {distribution.clientsServed} clients • {parseLocalDate(distribution.date).toLocaleDateString()}
+                                      {distribution.clientsServed} {t('distribution.clients')} • {parseLocalDate(distribution.date).toLocaleDateString()}
                                     </p>
                                   </div>
                                   <div className="distribution-weight">
-                                    {distribution.totalDistributed?.toFixed(0)} lbs
+                                    {distribution.totalDistributed?.toFixed(0)} {t('units.lbs')}
                                   </div>
                                 </div>
                               ))
@@ -1761,7 +1761,7 @@ System Health Check:
                               onClick={() => setActiveOverviewSection('distributions')}
                               style={{ marginTop: '16px' }}
                             >
-                              View All Distributions
+                              {t('dashboard.view-all-distributions')}
                             </button>
                           )}
                         </div>

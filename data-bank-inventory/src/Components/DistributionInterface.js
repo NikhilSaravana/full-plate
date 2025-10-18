@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { getMyPlateCategory } from './FoodCategoryMapper';
 import { getUnitConverters } from './UnitConfiguration';
-
 import ConfirmationDialog from './ConfirmationDialog';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // High-level categories shown in the dropdown instead of the full 30+ list
 export const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
 
 const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
     recipient: '',
@@ -84,9 +85,9 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
     if (emptyIndices.length > 0) {
       setConfirmationConfig({
         type: 'error',
-        title: 'Missing Information',
-        message: 'Please fill in all required fields (Food Type and Quantity) or remove unused line items before recording the distribution. Empty lines are highlighted.',
-        confirmText: 'OK',
+        title: t('distribution.missing-info'),
+        message: t('distribution.missing-info-message'),
+        confirmText: t('ui.ok'),
         onConfirm: () => setShowConfirmation(false)
       });
       setShowConfirmation(true);
@@ -99,9 +100,9 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
     if (calculatedTotal !== enteredTotal) {
       setConfirmationConfig({
         type: 'error',
-        title: 'Data Mismatch',
-        message: `Age group totals (${calculatedTotal}) don't match total clients served (${enteredTotal}). Please check your entries.`,
-        confirmText: 'OK',
+        title: t('distribution.age-group-mismatch'),
+        message: `${t('distribution.age-group-mismatch-message')} (${calculatedTotal} vs ${enteredTotal})`,
+        confirmText: t('ui.ok'),
         onConfirm: () => setShowConfirmation(false)
       });
       setShowConfirmation(true);
@@ -212,10 +213,10 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
       <div className="form-container">
         {/* Basic Information */}
         <div className="form-section">
-          <h3>Distribution Details</h3>
+          <h3>{t('distribution.title')}</h3>
           <div className="form-grid">
             <div className="form-field">
-              <label className="form-label-enhanced">Date:</label>
+              <label className="form-label-enhanced">{t('form.date')}:</label>
               <input
                 type="date"
                 className="form-control-enhanced"
@@ -224,17 +225,17 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
               />
             </div>
             <div className="form-field">
-              <label className="form-label-enhanced">Recipient Organization/Program:</label>
+              <label className="form-label-enhanced">{t('distribution.recipient')}:</label>
               <input
                 type="text"
                 className="form-control-enhanced"
                 value={formData.recipient}
                 onChange={(e) => setFormData({...formData, recipient: e.target.value})}
-                placeholder="e.g., Local Food Pantry"
+                placeholder={t('distribution.recipient-placeholder')}
               />
             </div>
             <div className="form-field">
-              <label className="form-label-enhanced">Total Clients Served:</label>
+              <label className="form-label-enhanced">{t('distribution.clients-served')}:</label>
               <input
                 type="number"
                 className="form-control-enhanced"
@@ -243,22 +244,22 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
                   const total = parseInt(e.target.value) || 0;
                   setClientInfo({...clientInfo, clientsServed: e.target.value});
                 }}
-                placeholder="Total number of clients"
+                placeholder={t('distribution.clients-served')}
                 readOnly
                 style={{backgroundColor: '#f8f9fa', cursor: 'not-allowed'}}
               />
               <small className="form-text text-muted">
-                This field is automatically calculated from age demographics above
+                {t('distribution.auto-calculated')}
               </small>
             </div>
           </div>
           
           {/* Age Group Breakdown */}
           <div className="form-section">
-            <h3>Client Age Demographics</h3>
+            <h3>{t('distribution.age-groups')}</h3>
             <div className="form-grid">
               <div className="form-field">
-                <label className="form-label-enhanced">Children (0-17 years):</label>
+                <label className="form-label-enhanced">{t('distribution.children')}:</label>
                 <input
                   type="number"
                   className="form-control-enhanced"
@@ -273,12 +274,12 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
                       clientsServed: totalClients.toString()
                     });
                   }}
-                  placeholder="Number of children"
+                  placeholder={t('distribution.children')}
                   min="0"
                 />
               </div>
               <div className="form-field">
-                <label className="form-label-enhanced">Adults (18-64 years):</label>
+                <label className="form-label-enhanced">{t('distribution.adults')}:</label>
                 <input
                   type="number"
                   className="form-control-enhanced"
@@ -293,12 +294,12 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
                       clientsServed: totalClients.toString()
                     });
                   }}
-                  placeholder="Number of adults"
+                  placeholder={t('distribution.adults')}
                   min="0"
                 />
               </div>
               <div className="form-field">
-                <label className="form-label-enhanced">Elders (65+ years):</label>
+                <label className="form-label-enhanced">{t('distribution.elderly')}:</label>
                 <input
                   type="number"
                   className="form-control-enhanced"
@@ -313,16 +314,16 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
                       clientsServed: totalClients.toString()
                     });
                   }}
-                  placeholder="Number of elders"
+                  placeholder={t('distribution.elderly')}
                   min="0"
                 />
               </div>
             </div>
             {clientInfo.clientsServed && (
               <div className="age-group-summary">
-                <p><strong>Total Clients:</strong> {clientInfo.ageGroups.kid + clientInfo.ageGroups.adult + clientInfo.ageGroups.elder} clients</p>
+                <p><strong>{t('distribution.total-clients')}:</strong> {clientInfo.ageGroups.kid + clientInfo.ageGroups.adult + clientInfo.ageGroups.elder} {t('distribution.clients')}</p>
                 <p className="text-muted">
-                  <small>Children: {clientInfo.ageGroups.kid} • Adults: {clientInfo.ageGroups.adult} • Elders: {clientInfo.ageGroups.elder}</small>
+                  <small>{t('distribution.children')}: {clientInfo.ageGroups.kid} • {t('distribution.adults')}: {clientInfo.ageGroups.adult} • {t('distribution.elderly')}: {clientInfo.ageGroups.elder}</small>
                 </p>
               </div>
             )}
@@ -331,10 +332,10 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
 
         {/* Items Section */}
         <div className="form-section">
-          <h3>Distributed Items</h3>
+          <h3>{t('distribution.distribution-items')}</h3>
           <div className="quick-add-section">
             <div className="quick-add-header">
-              <span className="quick-add-label">Quick Add Common Items:</span>
+              <span className="quick-add-label">{t('survey.quick-add-common')}</span>
             </div>
             <div className="quick-add-buttons">
               {getQuickAddButtons().map(item => (
@@ -373,41 +374,41 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
               <div className="item-main-row">
                 <div className="item-inputs">
                   <div className="input-group">
-                    <label className="form-label-enhanced">Category</label>
+                    <label className="form-label-enhanced">{t('form.category')}</label>
                     <select
                       value={item.foodType}
                       onChange={(e) => updateItem(index, 'foodType', e.target.value)}
                       className="form-control-enhanced"
                     >
-                      <option value="">Select Category</option>
+                      <option value="">{t('survey.select-category')}</option>
                       {getFoodTypeOptions().map(type => (
                         <option key={type} value={type}>{type}</option>
                       ))}
                     </select>
                   </div>
                   <div className="input-group">
-                    <label className="form-label-enhanced">Product</label>
+                    <label className="form-label-enhanced">{t('form.product')}</label>
                     <input
                       type="text"
-                      placeholder="e.g., White Bread, Low-fat Milk"
+                      placeholder={t('survey.product-placeholder')}
                       className="form-control-enhanced"
                       value={item.product}
                       onChange={(e) => updateItem(index, 'product', e.target.value)}
                     />
                   </div>
                   <div className="input-group">
-                    <label className="form-label-enhanced">Quantity</label>
+                    <label className="form-label-enhanced">{t('form.quantity')}</label>
                     <input
                       type="number"
                       step="0.1"
                       value={item.quantity}
                       onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                      placeholder="Quantity"
+                      placeholder={t('survey.quantity-placeholder')}
                       className="form-control-enhanced"
                     />
                   </div>
                   <div className="input-group">
-                    <label className="form-label-enhanced">Unit</label>
+                    <label className="form-label-enhanced">{t('form.unit')}</label>
                     <select
                       value={item.unit}
                       onChange={(e) => updateItem(index, 'unit', e.target.value)}
@@ -423,17 +424,17 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
                     </select>
                   </div>
                   <div className="input-group">
-                    <label className="form-label-enhanced">Category</label>
+                    <label className="form-label-enhanced">{t('form.category')}</label>
                     <div className="category-display">
-                      {item.foodType || 'Select category first'}
+                      {item.foodType || t('survey.select-category-first')}
                     </div>
                   </div>
                   <div className="input-group">
-                    <label className="form-label-enhanced">Weight</label>
+                    <label className="form-label-enhanced">{t('form.weight')}</label>
                     <div className="weight-display">
                       {item.quantity && item.foodType ? 
                         getUnitDisplayWeight(item.quantity, item.unit, item.foodType) : 
-                        'Enter quantity'
+                        t('survey.enter-quantity')
                       }
                     </div>
                   </div>
@@ -443,19 +444,19 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
                     <button
                       onClick={() => removeItem(index)}
                       className="btn btn-danger remove-btn"
-                      title="Remove this item"
+                      title={t('survey.remove-item')}
                     >
-                      Remove
+                      {t('survey.remove-item')}
                     </button>
                   )}
                 </div>
               </div>
               <div className="item-notes-row">
                 <div className="input-group notes-input-group">
-                  <label className="form-label-enhanced">Notes (Optional)</label>
+                  <label className="form-label-enhanced">{t('inventory.notes')} ({t('ui.optional')})</label>
                   <input
                     type="text"
-                    placeholder="Additional notes about this item..."
+                    placeholder={t('survey.additional-notes')}
                     className="form-control-enhanced"
                     value={item.notes}
                     onChange={(e) => updateItem(index, 'notes', e.target.value)}
@@ -466,24 +467,24 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
           ))}
 
           <button onClick={addItem} className="btn btn-secondary">
-            Add Another Item
+            + {t('survey.add-item')}
           </button>
 
           {items.length > 0 && (
             <div className="distribution-summary">
-              <p><strong>Total Weight:</strong> {calculateTotalWeight().toFixed(1)} lbs</p>
-              <p><strong>Total Items:</strong> {items.filter(item => item.foodType && item.quantity).length}</p>
+              <p><strong>{t('survey.total-weight')}:</strong> {calculateTotalWeight().toFixed(1)} {t('units.lbs')}</p>
+              <p><strong>{t('inventory.total-items')}:</strong> {items.filter(item => item.foodType && item.quantity).length}</p>
               {clientInfo.clientsServed && (
                 <>
-                  <p><strong>Total Clients:</strong> {clientInfo.clientsServed}</p>
-                  <p><strong>Average per Client:</strong> {(calculateTotalWeight() / parseFloat(clientInfo.clientsServed)).toFixed(1)} lbs</p>
+                  <p><strong>{t('distribution.total-clients')}:</strong> {clientInfo.clientsServed}</p>
+                  <p><strong>{t('distribution.avg-per-client')}:</strong> {(calculateTotalWeight() / parseFloat(clientInfo.clientsServed)).toFixed(1)} {t('units.lbs')}</p>
                   {(clientInfo.ageGroups.kid > 0 || clientInfo.ageGroups.adult > 0 || clientInfo.ageGroups.elder > 0) && (
                     <div className="age-group-breakdown">
-                      <p><strong>Age Demographics:</strong></p>
+                      <p><strong>{t('distribution.age-demographics')}:</strong></p>
                       <ul>
-                        {clientInfo.ageGroups.kid > 0 && <li>Children (0-17): {clientInfo.ageGroups.kid}</li>}
-                        {clientInfo.ageGroups.adult > 0 && <li>Adults (18-64): {clientInfo.ageGroups.adult}</li>}
-                        {clientInfo.ageGroups.elder > 0 && <li>Elders (65+): {clientInfo.ageGroups.elder}</li>}
+                        {clientInfo.ageGroups.kid > 0 && <li>{t('distribution.children')}: {clientInfo.ageGroups.kid}</li>}
+                        {clientInfo.ageGroups.adult > 0 && <li>{t('distribution.adults')}: {clientInfo.ageGroups.adult}</li>}
+                        {clientInfo.ageGroups.elder > 0 && <li>{t('distribution.elderly')}: {clientInfo.ageGroups.elder}</li>}
                       </ul>
                     </div>
                   )}
@@ -495,12 +496,12 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
 
         <div className="form-section">
           <div className="form-field">
-            <label className="form-label-enhanced">Additional Notes:</label>
+            <label className="form-label-enhanced">{t('inventory.notes')}:</label>
             <textarea
               className="form-control-enhanced"
               value={formData.notes}
               onChange={(e) => setFormData({...formData, notes: e.target.value})}
-              placeholder="Any additional notes about this distribution"
+              placeholder={t('distribution.additional-notes')}
               rows="3"
             />
           </div>
@@ -518,7 +519,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
             </span>
           )}
           <button onClick={submitDistribution} className="btn btn-primary btn-large">
-            Submit Survey
+            {t('distribution.submit-distribution')}
           </button>
         </div>
 
