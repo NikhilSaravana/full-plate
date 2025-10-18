@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import MyPlateCalculator from './MyPlateCalculator';
 import InventoryManager from './InventoryManager';
 import SurveyInterface from './SurveyInterface';
@@ -7,6 +8,8 @@ import DistributionInterface from './DistributionInterface';
 import UnitConfiguration from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
 import ReportsInterface from './ReportsInterface';
+import GuidedTour from './GuidedTour';
+import LanguageSelector from './LanguageSelector';
 import firestoreService from '../services/firestoreService';
 import { UnitConverters } from './UnitConfiguration';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -54,6 +57,7 @@ const DEFAULT_UNIT_CONFIGS = {
 
 const Dashboard = () => {
   const { currentUser, logout } = useAuth();
+  const { t } = useLanguage();
 
   // Real inventory state that starts empty and gets populated by user data
   const [currentInventory, setCurrentInventory] = useState({
@@ -210,6 +214,10 @@ const Dashboard = () => {
   });
   const [currentSection, setCurrentSection] = useState('overview'); // For breadcrumb navigation
   const [showHelp, setShowHelp] = useState(false);
+
+  // Guided Tour State
+  const [showTour, setShowTour] = useState(false);
+  const [isTourRunning, setIsTourRunning] = useState(false);
 
   // Firebase Integration State
   const [syncStatus, setSyncStatus] = useState('disconnected'); // 'connected', 'syncing', 'error', 'disconnected'
@@ -1112,6 +1120,29 @@ System Health Check:
     }
   };
 
+  // Guided Tour Functions
+  const handleStartTour = () => {
+    setIsTourRunning(true);
+  };
+
+  const handleCloseTour = () => {
+    setShowTour(false);
+    setIsTourRunning(false);
+  };
+
+  // Check if user should see tour on first visit
+  useEffect(() => {
+    if (isFirstTime && currentUser) {
+      const hasSeenTour = localStorage.getItem(`hasSeenTour_${currentUser.uid}`);
+      if (!hasSeenTour) {
+        // Show tour after a short delay to let the page load
+        setTimeout(() => {
+          setShowTour(true);
+        }, 1000);
+      }
+    }
+  }, [isFirstTime, currentUser]);
+
   // Firebase connection state monitoring
   useEffect(() => {
     const unsubscribe = firestoreService.onConnectionStateChange((status) => {
@@ -1222,17 +1253,29 @@ System Health Check:
         <header className="dashboard-header">
           <div className="header-content">
             <div className="header-left">
-          <h1>FullPlate</h1>
+          <h1>{t('header.title')}</h1>
           {isFirstTime && (
             <div className="help-text-prominent">
-              <strong>Welcome to FullPlate!</strong>
+              <strong>{t('header.welcome')}</strong>
               <br />
-              Get started by clicking the "Food Intake" tab above to record your current food inventory. 
-              This system will help you track food donations, manage distributions, and ensure nutritional balance.
+              {t('header.welcome-description')}
             </div>
           )}
             </div>
             <div className="header-right">
+              {/* Language Selector */}
+              <LanguageSelector />
+              
+              {/* Tour Button */}
+              <button 
+                onClick={() => setShowTour(true)}
+                className="btn btn-light"
+                style={{ minHeight: '36px', padding: '8px 16px' }}
+                title={t('tooltip.take-tour')}
+              >
+                🚀 {t('btn.start-tour')}
+              </button>
+
               {/* Phase 7A: Enhanced Status Indicator */}
               <div className="sync-status">
                 <div className={`status-indicator ${
@@ -1259,36 +1302,36 @@ System Health Check:
                   {currentUser?.displayName || currentUser?.email || 'User'}
                 </span>
                 <button onClick={handleLogout} className="btn btn-light" style={{ minHeight: '36px', padding: '8px 16px' }}>
-                  Sign Out
+                  {t('header.sign-out')}
                 </button>
               </div>
             </div>
           </div>
           <div className="header-stats">
             <div className="stat-card">
-              <h3>Total Inventory</h3>
+              <h3>{t('stats.total-inventory')}</h3>
               <p className="stat-value">
-                {getTotalInventory().toLocaleString()} lbs
+                {getTotalInventory().toLocaleString()} {t('units.lbs')}
               </p>
             </div>
             <div className="stat-card">
-              <h3>Distributed Today</h3>
-              <p className="stat-value">{outgoingMetrics.totalDistributedToday.toLocaleString()} lbs</p>
+              <h3>{t('stats.distributed-today')}</h3>
+              <p className="stat-value">{outgoingMetrics.totalDistributedToday.toLocaleString()} {t('units.lbs')}</p>
             </div>
             <div className="stat-card">
-              <h3>MyPlate Compliance</h3>
+              <h3>{t('stats.myplate-compliance')}</h3>
               <p className="stat-value">{getMyPlateCompliance()}</p>
             </div>
             <div className="stat-card">
-              <h3>Clients Served Today</h3>
+              <h3>{t('stats.clients-served-today')}</h3>
               <p className="stat-value">{outgoingMetrics.clientsServedToday}</p>
             </div>
             <div className="stat-card critical">
-              <h3>Critical Alerts</h3>
+              <h3>{t('stats.critical-alerts')}</h3>
               <p className="stat-value">{combinedAlerts.filter(alert => alert.type === 'CRITICAL').length}</p>
             </div>
             <div className="stat-card warning">
-              <h3>Warnings</h3>
+              <h3>{t('stats.warnings')}</h3>
               <p className="stat-value">{combinedAlerts.filter(alert => alert.type === 'WARNING').length}</p>
             </div>
           </div>
@@ -1304,43 +1347,47 @@ System Health Check:
                 setCurrentSection('overview');
               }}
             >
-              Overview
+              {t('nav.overview')}
             </button>
             <button 
               className={`nav-tab ${activeTab === 'dataentry' ? 'active' : ''}`}
+              data-tab="dataentry"
               onClick={() => {
                 setActiveTab('dataentry');
                 setCurrentSection('dataentry');
               }}
             >
-              Food Intake
+              {t('nav.food-intake')}
             </button>
             <button 
               className={`nav-tab ${activeTab === 'distribution' ? 'active' : ''}`}
+              data-tab="distribution"
               onClick={() => {
                 setActiveTab('distribution');
                 setCurrentSection('distribution');
               }}
             >
-              Distribution
+              {t('nav.distribution')}
             </button>
             <button 
               className={`nav-tab ${activeTab === 'myplate' ? 'active' : ''}`}
+              data-tab="myplate"
               onClick={() => {
                 setActiveTab('myplate');
                 setCurrentSection('myplate');
               }}
             >
-              MyPlate Analysis
+              {t('nav.myplate')}
             </button>
             <button 
               className={`nav-tab ${activeTab === 'reports' ? 'active' : ''}`}
+              data-tab="reports"
               onClick={() => {
                 setActiveTab('reports');
                 setCurrentSection('reports');
               }}
             >
-              Reports
+              {t('nav.reports')}
             </button>
           </div>
           
@@ -1348,9 +1395,9 @@ System Health Check:
           <div className="nav-utils">
             <div className="tooltip-wrapper">
               <button onClick={performSystemHealthCheck} className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px' }}>
-                Check
+                {t('btn.check')}
             </button>
-              <div className="tooltip">System Health Check</div>
+              <div className="tooltip">{t('tooltip.system-health')}</div>
             </div>
             <div className="tooltip-wrapper">
               <button 
@@ -1363,9 +1410,9 @@ System Health Check:
                 className="btn btn-warning" 
                 style={{ minWidth: 'auto', padding: '8px 12px' }}
               >
-                Reset Today
+                {t('btn.reset-today')}
               </button>
-              <div className="tooltip">Reset Today's Metrics</div>
+              <div className="tooltip">{t('tooltip.reset-today')}</div>
             </div>
 
             <div className="tooltip-wrapper">
@@ -1379,9 +1426,9 @@ System Health Check:
                 className="btn btn-danger" 
                 style={{ minWidth: 'auto', padding: '8px 12px' }}
               >
-                Reset
+                {t('btn.reset')}
               </button>
-              <div className="tooltip">Reset All Data</div>
+              <div className="tooltip">{t('tooltip.reset-all')}</div>
             </div>
           </div>
         </nav>
@@ -1390,21 +1437,21 @@ System Health Check:
           {/* Phase 7A: Breadcrumb Navigation */}
           <div className="breadcrumb">
             <div className="breadcrumb-item">
-              <span>Food Bank Manager</span>
+              <span>{t('breadcrumb.food-bank-manager')}</span>
             </div>
             <span className="breadcrumb-separator">›</span>
             <div className="breadcrumb-item breadcrumb-current">
               {activeTab === 'overview' && (
                 <>
-                  <span>Overview</span>
+                  <span>{t('nav.overview')}</span>
                   {activeOverviewSection !== 'dashboard' && (
                     <>
                       <span className="breadcrumb-separator">›</span>
                       <span>
-                        {activeOverviewSection === 'inventory' && 'Inventory Management'}
-                        {activeOverviewSection === 'units' && 'Unit Configuration'}
-                        {activeOverviewSection === 'reports' && 'Analytics'}
-                        {activeOverviewSection === 'distributions' && 'Distribution History'}
+                        {activeOverviewSection === 'inventory' && t('breadcrumb.inventory-management')}
+                        {activeOverviewSection === 'units' && t('breadcrumb.unit-configuration')}
+                        {activeOverviewSection === 'reports' && t('breadcrumb.analytics')}
+                        {activeOverviewSection === 'distributions' && t('breadcrumb.distribution-history')}
                       </span>
                     </>
                   )}
@@ -1412,22 +1459,22 @@ System Health Check:
               )}
               {activeTab === 'dataentry' && (
                 <>
-                  <span>Food Intake</span>
+                  <span>{t('nav.food-intake')}</span>
                 </>
               )}
               {activeTab === 'distribution' && (
                 <>
-                  <span>Distribution</span>
+                  <span>{t('nav.distribution')}</span>
                 </>
               )}
               {activeTab === 'myplate' && (
                 <>
-                  <span>MyPlate Analysis</span>
+                  <span>{t('nav.myplate')}</span>
                 </>
               )}
               {activeTab === 'reports' && (
                 <>
-                  <span>Reports</span>
+                  <span>{t('nav.reports')}</span>
                 </>
               )}
             </div>
@@ -1875,6 +1922,13 @@ System Health Check:
         title={confirmationDialog.title}
         message={confirmationDialog.message}
         type={confirmationDialog.type}
+      />
+
+      {/* Guided Tour */}
+      <GuidedTour
+        isOpen={showTour || isTourRunning}
+        onClose={handleCloseTour}
+        onStartTour={handleStartTour}
       />
     </div>
     </>
