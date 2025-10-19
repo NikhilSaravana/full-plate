@@ -4505,12 +4505,12 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  /* Darkening moved to spotlight ring for proper cutout */
+  background-color: transparent;
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 10000;
-  backdrop-filter: blur(3px);
 }
 
 /* Tour Highlight Styles */
@@ -4521,6 +4521,65 @@
   border-radius: 8px !important;
   background: rgba(0, 123, 255, 0.1) !important;
   animation: tour-pulse 2s infinite !important;
+}
+
+/* Spotlight ring that dims everything outside the target rect */
+.tour-spotlight {
+  position: fixed;
+  border-radius: 8px;
+  /* outer huge shadow creates dimming outside the spotlight; ring handled by .tour-highlight */
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+  pointer-events: none; /* let clicks pass through to step controls */
+  z-index: 10000; /* below the step (10001), above page */
+}
+
+/* --- Bulk Upload Controls --- */
+.bulk-upload-controls {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin: 12px 0 8px 0;
+}
+
+.bulk-upload-controls .file-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bulk-upload-controls .form-label-enhanced {
+  font-weight: 600;
+  color: #495057;
+}
+
+.bulk-upload-controls .file-input {
+  display: inline-block;
+  padding: 6px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  background: #fff;
+  color: #495057;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.bulk-upload-controls .file-input:hover {
+  border-color: #2c5aa0;
+  box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.15);
+}
+
+.bulk-upload-controls .file-input:focus {
+  outline: none;
+  border-color: #2c5aa0;
+  box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.25);
+}
+
+/* Compact layout on small screens */
+@media (max-width: 640px) {
+  .bulk-upload-controls {
+    gap: 12px;
+  }
 }
 
 @keyframes tour-pulse {

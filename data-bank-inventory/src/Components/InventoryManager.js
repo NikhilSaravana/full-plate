@@ -117,7 +117,7 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, 
     setDetailedInventory(prev => ({
       ...prev,
       [category]: {
-        items: [...(prev[category]?.items || []), itemData],
+        items: [itemData, ...(prev[category]?.items || [])],
         total: (prev[category]?.total || 0) + weightInPounds
       }
     }));

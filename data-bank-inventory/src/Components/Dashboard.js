@@ -1159,28 +1159,45 @@ System Health Check:
     }
   };
 
+  // Guided Tour persistence helpers
+  const markTourSeen = () => {
+    try {
+      if (currentUser) {
+        localStorage.setItem(`hasSeenTour_${currentUser.uid}`, 'true');
+      } else {
+        localStorage.setItem('hasSeenTour_guest', 'true');
+      }
+    } catch (e) {
+      console.error('Failed to persist hasSeenTour flag:', e);
+    }
+  };
+
   // Guided Tour Functions
   const handleStartTour = () => {
     setIsTourRunning(true);
+    // Mark as seen once user starts the tour to avoid future auto-popups
+    markTourSeen();
   };
 
   const handleCloseTour = () => {
     setShowTour(false);
     setIsTourRunning(false);
+    // Persist that the user has seen or dismissed the tour
+    markTourSeen();
   };
 
-  // Check if user should see tour on first visit
+  // Check if user should see tour on first visit (persisted across refreshes)
   useEffect(() => {
-    if (isFirstTime && currentUser) {
-      const hasSeenTour = localStorage.getItem(`hasSeenTour_${currentUser.uid}`);
-      if (!hasSeenTour) {
-        // Show tour after a short delay to let the page load
-        setTimeout(() => {
-          setShowTour(true);
-        }, 1000);
-      }
+    // Determine key for logged-in user or guest
+    const key = currentUser ? `hasSeenTour_${currentUser.uid}` : 'hasSeenTour_guest';
+    const hasSeenTour = localStorage.getItem(key);
+    if (!hasSeenTour) {
+      // Show tour after a short delay to let the page load
+      setTimeout(() => {
+        setShowTour(true);
+      }, 1000);
     }
-  }, [isFirstTime, currentUser]);
+  }, [currentUser]);
 
   // Firebase connection state monitoring
   useEffect(() => {

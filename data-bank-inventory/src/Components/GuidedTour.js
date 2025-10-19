@@ -6,6 +6,7 @@ const GuidedTour = ({ isOpen, onClose, onStartTour }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [highlightedElement, setHighlightedElement] = useState(null);
+  const [spotlightRect, setSpotlightRect] = useState(null);
 
   const tourSteps = [
     {
@@ -126,6 +127,7 @@ const GuidedTour = ({ isOpen, onClose, onStartTour }) => {
     if (element) {
       element.classList.add('tour-highlight');
       setHighlightedElement(element);
+      updateSpotlight(element);
       
       // Scroll element into view
       element.scrollIntoView({ 
@@ -141,7 +143,35 @@ const GuidedTour = ({ isOpen, onClose, onStartTour }) => {
       highlightedElement.classList.remove('tour-highlight');
       setHighlightedElement(null);
     }
+    setSpotlightRect(null);
   };
+
+  const updateSpotlight = (element) => {
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    const padding = 6; // small padding around element
+    setSpotlightRect({
+      top: rect.top + scrollTop - padding,
+      left: rect.left + scrollLeft - padding,
+      width: rect.width + padding * 2,
+      height: rect.height + padding * 2
+    });
+  };
+
+  // Keep spotlight aligned on scroll/resize
+  useEffect(() => {
+    const handleRealign = () => {
+      if (highlightedElement) updateSpotlight(highlightedElement);
+    };
+    window.addEventListener('scroll', handleRealign, true);
+    window.addEventListener('resize', handleRealign);
+    return () => {
+      window.removeEventListener('scroll', handleRealign, true);
+      window.removeEventListener('resize', handleRealign);
+    };
+  }, [highlightedElement]);
 
   if (!isOpen) return null;
 
@@ -237,6 +267,17 @@ const GuidedTour = ({ isOpen, onClose, onStartTour }) => {
 
   return (
     <div className="guided-tour-overlay">
+      {spotlightRect && (
+        <div
+          className="tour-spotlight"
+          style={{
+            top: spotlightRect.top,
+            left: spotlightRect.left,
+            width: spotlightRect.width,
+            height: spotlightRect.height
+          }}
+        />
+      )}
       <div 
         className={`guided-tour-step ${currentStepData.position}`}
         style={stepPosition}

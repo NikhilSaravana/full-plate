@@ -3,6 +3,7 @@ import { getMyPlateCategory } from './FoodCategoryMapper';
 import { getUnitConverters } from './UnitConfiguration';
 import ConfirmationDialog from './ConfirmationDialog';
 import { useLanguage } from '../contexts/LanguageContext';
+import * as XLSX from 'xlsx';
 
 // High-level categories for simplified selection
 export const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
@@ -31,8 +32,30 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
 
   const unitConverters = getUnitConverters(unitConfig);
 
+  
+  const normalizeUnitKey = (raw) => {
+    if (!raw) return 'POUND';
+    const value = String(raw).trim();
+    const upper = value.toUpperCase();
+    const available = unitConverters.getAvailableUnits();
+    const byKey = available.find(u => u.key === upper);
+    if (byKey) return byKey.key;
+    const byAbbrev = available.find(u => (u.abbreviation || '').toUpperCase() === upper);
+    if (byAbbrev) return byAbbrev.key;
+    const byName = available.find(u => (u.name || '').toUpperCase() === upper);
+    if (byName) return byName.key;
+    return 'POUND';
+  };
+
+  // Normalize a category into one of MAIN_FOOD_CATEGORIES, else empty string
+  const normalizeCategory = (raw) => {
+    const value = String(raw || '').trim().toUpperCase();
+    if (MAIN_FOOD_CATEGORIES.includes(value)) return value;
+    return '';
+  };
+
   const addItem = () => {
-    setItems([...items, { foodType: '', product: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }]);
+    setItems([{ foodType: '', product: '', quantity: '', unit: 'POUND', expirationDate: '', notes: '' }, ...items]);
   };
 
   const removeItem = (index) => {
@@ -57,21 +80,90 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
     try {
       // Parse CSV-like data: "Category, Product, Quantity, Unit, Expiration"
       const lines = bulkData.split('\n').filter(line => line.trim());
-      const parsedItems = lines.map(line => {
-        const parts = line.split(',').map(part => part.trim());
-        return {
-          foodType: parts[0] || '', // Category (VEG, FRUIT, etc.)
-          product: parts[1] || '', // Product name (Apples, Bread, etc.)
-          quantity: parts[2] || '',
-          unit: parts[3] || 'POUND',
-          expirationDate: parts[4] || '',
-          notes: parts[5] || ''
-        };
-      });
+      const parsedItems = lines
+        .map(line => {
+          const parts = line.split(',').map(part => part.trim());
+          return {
+            foodType: normalizeCategory(parts[0] || ''), 
+            product: parts[1] || '', 
+            quantity: parts[2] || '',
+            unit: normalizeUnitKey(parts[3] || 'POUND'),
+            expirationDate: parts[4] || '',
+            notes: parts[5] || ''
+          };
+        })
+        .filter(item => item.foodType && item.quantity);
       setItems(parsedItems);
       setBulkData('');
       setSurveyMode('SINGLE');
     } catch (error) {
+      setConfirmationConfig({
+        type: 'error',
+        title: t('survey.parsing-error'),
+        message: t('survey.parsing-error-message'),
+        confirmText: t('ui.ok'),
+        onConfirm: () => setShowConfirmation(false)
+      });
+      setShowConfirmation(true);
+    }
+  };
+
+  
+  const handleBulkFileUpload = (e) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result || '';
+      setBulkData(typeof text === 'string' ? text : '');
+    };
+    reader.readAsText(file);
+  };
+
+  // Import from Excel file
+  const handleExcelUpload = async (e) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+      const parsedItems = rows
+        .filter(r => Array.isArray(r) && r.some(cell => String(cell || '').trim().length))
+        .map(parts => ({
+          foodType: normalizeCategory(parts[0]),
+          product: (parts[1] || '').toString().trim(),
+          quantity: (parts[2] || '').toString().trim(),
+          unit: normalizeUnitKey(parts[3]),
+          expirationDate: (parts[4] || '').toString().trim(),
+          notes: (parts[5] || '').toString().trim()
+        }))
+        .filter(item => item.foodType && item.quantity);
+
+      if (parsedItems.length > 0) {
+        setItems(parsedItems);
+        setBulkData('');
+        setSurveyMode('SINGLE');
+        setConfirmationConfig({
+          type: 'success',
+          title: t('survey.import-success'),
+          message: t('survey.import-success-message'),
+          confirmText: t('ui.ok'),
+          onConfirm: () => setShowConfirmation(false)
+        });
+        setShowConfirmation(true);
+      } else {
+        setConfirmationConfig({
+          type: 'error',
+          title: t('survey.parsing-error'),
+          message: t('survey.parsing-error-message'),
+          confirmText: t('ui.ok'),
+          onConfirm: () => setShowConfirmation(false)
+        });
+        setShowConfirmation(true);
+      }
+    } catch (err) {
       setConfirmationConfig({
         type: 'error',
         title: t('survey.parsing-error'),
@@ -307,8 +399,8 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
                         updated[emptyIndex] = newItem;
                         setItems(updated);
                       } else {
-                        // Add a new item
-                        setItems([...items, newItem]);
+                        // Add a new item at the top
+                        setItems([newItem, ...items]);
                       }
                     }}
                   >
@@ -451,6 +543,23 @@ const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
               <br />
               {t('survey.available-units')}: {unitConverters.getAvailableUnits().map(u => u.abbreviation).join(', ')}
             </p>
+            <div className="bulk-upload-controls">
+              <div className="file-input-group">
+                <label className="form-label-enhanced">{t('survey.upload-csv-txt')}</label>
+                <input className="file-input" type="file" accept=".csv,.txt" onChange={handleBulkFileUpload} />
+              </div>
+              <div className="file-input-group">
+                <label className="form-label-enhanced">{t('survey.upload-xlsx')}</label>
+                <input className="file-input" type="file" accept=".xlsx" onChange={handleExcelUpload} />
+              </div>
+            </div>
+            <div className="help-text" style={{ marginBottom: '8px' }}>
+              <div><strong>Example:</strong></div>
+              <pre style={{ whiteSpace: 'pre-wrap', background: '#f7f7f9', padding: '8px', borderRadius: '4px' }}>GRAIN, Bread, 5, PALLET, 2024-02-15, From food drive
+DAIRY, Milk, 20, CASE, 2024-02-10
+GRAIN, Rice, 1000, POUND, 2025-01-01</pre>
+              <div>Excel columns: Category | Product | Quantity | Unit | Expiration (YYYY-MM-DD) | Notes</div>
+            </div>
             <textarea
               value={bulkData}
               onChange={(e) => setBulkData(e.target.value)}
