@@ -29,7 +29,7 @@ FullPlate is a web app for food banks to keep track of inventory, food intake, a
 - **Inventory:** Use the “Food Intake” tab to add food. Use “Inventory Management” for edits or advanced item tracking.
 - **Distribution:** When food is given out, use “Distribution” to log how much and to whom.
 - **Analytics:** Check the dashboard for totals, MyPlate status, and quick actions. Warnings will show if stock gets low or if nutrition balance is off.
-- **Help:** Click/copy the help button in the bottom-right corner of your screen for support.
+- **Help:** Click the help button in the bottom-right corner of your screen and copy the email address for support.
 
 ***
 
@@ -38,3 +38,4 @@ FullPlate is a web app for food banks to keep track of inventory, food intake, a
 - Built with ReactJS and Firebase.
 - Designed for simple use by volunteers and managers.
 - This project was made to fill a gap in food bank tracking tools and nutrition analysis for everyday organizations.
+- Please contact our team at [fullplateusa@gmail.com](mailto:fullplateusa@gmail.com) if you have any questions or concerns.
