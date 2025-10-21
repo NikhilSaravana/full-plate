@@ -29,7 +29,7 @@ FullPlate is a web app for food banks to keep track of inventory, food intake, a
 - **Inventory:** Use the “Food Intake” tab to add food. Use “Inventory Management” for edits or advanced item tracking.
 - **Distribution:** When food is given out, use “Distribution” to log how much and to whom.
 - **Analytics:** Check the dashboard for totals, MyPlate status, and quick actions. Warnings will show if stock gets low or if nutrition balance is off.
-- **Help:** Click the help button for support. The team’s contact email is easy to copy.
+- **Help:** Click/copy the help button in the bottom-right corner of your screen for support.
 
 ***
 
