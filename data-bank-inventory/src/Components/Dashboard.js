@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import MyPlateCalculator from './MyPlateCalculator';
 import InventoryManager from './InventoryManager';
 import SurveyInterface from './SurveyInterface';
@@ -10,6 +11,7 @@ import ConfirmationDialog from './ConfirmationDialog';
 import ReportsInterface from './ReportsInterface';
 import GuidedTour from './GuidedTour';
 import LanguageSelector from './LanguageSelector';
+import GlobalSearch from './GlobalSearch';
 import firestoreService from '../services/firestoreService';
 import { UnitConverters } from './UnitConfiguration';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -60,6 +62,7 @@ const DEFAULT_UNIT_CONFIGS = {
 const Dashboard = () => {
   const { currentUser, logout, getUserProfile } = useAuth();
   const { t } = useLanguage();
+  const { showSuccess, showError, showInfo } = useNotifications();
 
   // Real inventory state that starts empty and gets populated by user data
   const [currentInventory, setCurrentInventory] = useState({
@@ -280,10 +283,10 @@ const Dashboard = () => {
 
   // Pie chart colors
   const CATEGORY_COLORS = {
-    'DAIRY': '#2c5aa0', // Blue
-    'GRAIN': '#28a745', // Green
-    'PROTEIN': '#ffc107', // Yellow
-    'FRUIT': '#dc3545', // Red
+    'DAIRY': 'var(--accent-primary)', // Blue
+    'GRAIN': 'var(--success)', // Green
+    'PROTEIN': 'var(--warning)', // Yellow
+    'FRUIT': 'var(--error)', // Red
     'VEG': '#17a2b8', // Teal
     'PRODUCE': '#6f42c1', // Purple
     'MISC': '#fd7e14', // Orange
@@ -1456,6 +1459,13 @@ System Health Check:
           
           {/* Phase 7A: Enhanced Utility Controls with Tooltips */}
           <div className="nav-utils">
+            <GlobalSearch 
+              onSearch={(result) => {
+                showInfo('Search Result', `Found: ${result.title}`);
+                // In a real implementation, you would navigate to the result
+              }}
+              placeholder="Search inventory, distributions, reports..."
+            />
             <div className="tooltip-wrapper">
               <button onClick={performSystemHealthCheck} className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px' }}>
                 {t('btn.check')}

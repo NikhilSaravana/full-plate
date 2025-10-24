@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import firestoreService from '../services/firestoreService';
+import AIReportGenerator from './AIReportGenerator';
 
 const ReportsInterface = ({ distributionHistory }) => {
   const { currentUser } = useAuth();
@@ -268,12 +269,12 @@ const ReportsInterface = ({ distributionHistory }) => {
         <title>Food Bank Distribution Report</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
-          h1, h2, h3 { color: #333; }
+          h1, h2, h3 { color: var(--text-primary, #333); }
           .header { text-align: center; margin-bottom: 30px; }
           .section { margin-bottom: 25px; }
           table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f2f2f2; }
+          th, td { border: 1px solid var(--border-color, #ddd); padding: 8px; text-align: left; }
+          th { background-color: var(--bg-secondary, #f2f2f2); }
           .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
           .metric { margin-bottom: 10px; }
           .metric-label { font-weight: bold; }
@@ -353,7 +354,7 @@ const ReportsInterface = ({ distributionHistory }) => {
         ` : ''}
         
         <div class="no-print" style="margin-top: 30px; text-align: center;">
-          <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Print PDF</button>
+          <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; background-color: var(--accent-primary, #007bff); color: white; border: none; border-radius: 4px; cursor: pointer;">Print PDF</button>
         </div>
       </body>
       </html>
@@ -604,6 +605,13 @@ const ReportsInterface = ({ distributionHistory }) => {
             </div>
           </div>
         )}
+        
+        {/* AI Report Generator */}
+        <AIReportGenerator 
+          inventoryData={[]} // You can pass actual inventory data here
+          distributionData={distributionHistory}
+          surveyData={[]} // You can pass actual survey data here
+        />
       </div>
     </div>
   );
