@@ -42,12 +42,18 @@ const Login = () => {
   
 
   return (
-    <div className="auth-container">
+    <div className="auth-container" style={{ position: 'relative', minHeight: '100vh', overflow: 'hidden' }}>
       <FoodBackground count={18} />
-      <div className="auth-card">
+      <div className="auth-card" style={{ background: 'rgba(255,255,255,0.92)', zIndex: 2, position: 'relative' }}>
         <div className="auth-header">
-          <h2>FullPlate</h2>
-          <h3>Inventory Management Tool</h3>
+          <div className="auth-logo-container">
+            <img 
+              src="/1 copy.png" 
+              alt="FullPlate Logo" 
+              className="auth-logo"
+            />
+          </div>
+          <h2></h2>
           <p>Sign in to your account below</p>
           {/* {isFirebaseConfigured && (
             <div className="firebase-status">

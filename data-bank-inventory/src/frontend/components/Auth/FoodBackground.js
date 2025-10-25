@@ -1,6 +1,6 @@
 import React from 'react';
 
-const FOOD_EMOJIS = ['🍎', '🍞', '🥕', '🧀', '🍇', '🍌', '🍕', '🍉', '🥦', '🍪', '🍔', '🍓', '🍊', '🥚', '🥨'];
+const FOOD_EMOJIS = ['🍎', '🍞', '🥕', '🧀', '🍇', '🍌', '🍉', '🥦', '🍓', '🍊', '🥚', '🥨', '🥬', '🍅', '🥔'];
 
 function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -18,19 +18,29 @@ function isInCardArea(leftPercent) {
 }
 
 const FoodBackground = ({ count = 18 }) => {
-  const emojis = [];
-  let attempts = 0;
-  while (emojis.length < count && attempts < count * 10) {
-    attempts++;
-    const emoji = FOOD_EMOJIS[getRandomInt(0, FOOD_EMOJIS.length - 1)];
-    const left = getRandomInt(0, 100); // percent
-    const size = getRandomInt(28, 48); // px
-    const duration = getRandomInt(7, 16); // seconds
-    const delay = getRandomInt(0, 10); // seconds
-    if (!isInCardArea(left)) {
-      emojis.push({ emoji, left, size, duration, delay, key: emojis.length });
-    }
-  }
+  // Fixed positions for consistent layout across refreshes
+  const fixedPositions = [
+    { emoji: '🍎', left: 15, top: 20, size: 32 },
+    { emoji: '🍞', left: 85, top: 25, size: 28 },
+    { emoji: '🥕', left: 25, top: 45, size: 36 },
+    { emoji: '🧀', left: 75, top: 50, size: 30 },
+    { emoji: '🍇', left: 10, top: 70, size: 34 },
+    { emoji: '🍌', left: 90, top: 75, size: 26 },
+    { emoji: '🍉', left: 35, top: 15, size: 38 },
+    { emoji: '🥦', left: 65, top: 35, size: 32 },
+    { emoji: '🍓', left: 20, top: 60, size: 28 },
+    { emoji: '🍊', left: 80, top: 65, size: 30 },
+    { emoji: '🥚', left: 45, top: 30, size: 26 },
+    { emoji: '🥨', left: 55, top: 80, size: 34 },
+    { emoji: '🥬', left: 5, top: 40, size: 32 },
+    { emoji: '🍅', left: 95, top: 40, size: 28 },
+    { emoji: '🥔', left: 30, top: 85, size: 30 },
+    { emoji: '🍎', left: 70, top: 10, size: 36 },
+    { emoji: '🍞', left: 40, top: 55, size: 28 },
+    { emoji: '🥕', left: 60, top: 20, size: 32 }
+  ];
+
+  const emojis = fixedPositions.slice(0, count);
 
   return (
     <div
@@ -46,7 +56,7 @@ const FoodBackground = ({ count = 18 }) => {
       }}
       aria-hidden="true"
     >
-      {/* Pastel background */}
+      {/* Professional gradient background */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -54,27 +64,29 @@ const FoodBackground = ({ count = 18 }) => {
         width: '100vw',
         height: '100vh',
         zIndex: 0,
-        background: 'linear-gradient(135deg, #e0f2fe 0%, #f0e7ff 100%)',
+        background: 'linear-gradient(135deg, #293c47 0%, #1a2a35 50%, #293c47 100%)',
       }} />
-      <style>{`
-        @keyframes food-fall {
-          0% { transform: translateY(-60px) rotate(0deg) scale(1); opacity: 0.7; }
-          10% { opacity: 1; }
-          100% { transform: translateY(100vh) rotate(360deg) scale(1.1); opacity: 0.8; }
-        }
-      `}</style>
-      {emojis.map(({ emoji, left, size, duration, delay, key }) => (
+      {/* Subtle overlay pattern */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 1,
+        background: 'radial-gradient(circle at 20% 80%, rgba(196, 164, 100, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(196, 164, 100, 0.08) 0%, transparent 50%)',
+      }} />
+      {emojis.map(({ emoji, left, top, size, key }) => (
         <span
           key={key}
           style={{
             position: 'absolute',
             left: `${left}%`,
-            top: '-60px',
+            top: `${top}%`,
             fontSize: `${size}px`,
-            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.12))',
-            animation: `food-fall ${duration}s linear ${delay}s infinite`,
+            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
             userSelect: 'none',
-            opacity: 0.85,
+            opacity: 0.4,
             zIndex: 1,
           }}
         >

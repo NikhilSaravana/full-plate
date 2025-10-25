@@ -4196,6 +4196,175 @@ td {
   border: 1px solid #bee5eb;
 }
 
+/* --- Auth Pages Styling --- */
+.auth-container {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.auth-card {
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(15px);
+  border-radius: 24px;
+  padding: 48px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  max-width: 480px;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.auth-logo-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.auth-logo {
+  height: 9rem;
+  width: auto;
+  max-width: 22rem;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.auth-header h2 {
+  color: #293c47;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 10px 0;
+  letter-spacing: -0.025em;
+}
+
+.auth-header p {
+  color: #666;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  color: #293c47;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.form-group input {
+  padding: 12px 16px;
+  border: 2px solid #e1e5e9;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #c4a464;
+  box-shadow: 0 0 0 3px rgba(196, 164, 100, 0.1);
+}
+
+.auth-btn {
+  padding: 14px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 10px;
+}
+
+.auth-btn.primary {
+  background: linear-gradient(135deg, #c4a464 0%, #b8941f 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(196, 164, 100, 0.3);
+}
+
+.auth-btn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b8941f 0%, #9a7a1a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(196, 164, 100, 0.4);
+}
+
+.auth-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #e1e5e9;
+}
+
+.auth-footer p {
+  color: #666;
+  margin: 0;
+}
+
+.auth-footer a {
+  color: #c4a464;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-footer a:hover {
+  color: #b8941f;
+  text-decoration: underline;
+}
+
+.forgot-password-link {
+  text-align: right;
+  margin-top: 8px;
+}
+
+.forgot-password-link a {
+  color: #c4a464;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.forgot-password-link a:hover {
+  color: #b8941f;
+  text-decoration: underline;
+}
+
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #f5c6cb;
+  font-size: 0.95rem;
+  margin-bottom: 20px;
+}
+
 /* --- Welcome/Help Text --- */
 .help-text-prominent {
   background: #e7f3ff;
@@ -8119,12 +8288,13 @@ kbd {
   justify-content: center;
   align-items: center;
   z-index: 10000;
+  pointer-events: auto;
 }
 
 /* Tour Highlight Styles */
 .tour-highlight {
   position: relative;
-  z-index: 10001 !important;
+  z-index: 10003 !important;
   box-shadow: 0 0 0 4px #c4a464, 0 0 20px rgba(196, 164, 100, 0.5) !important;
   border-radius: 8px !important;
   background: rgba(196, 164, 100, 0.1) !important;
@@ -8138,7 +8308,7 @@ kbd {
   /* outer huge shadow creates dimming outside the spotlight; ring handled by .tour-highlight */
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
   pointer-events: none; /* let clicks pass through to step controls */
-  z-index: 10000; /* below the step (10001), above page */
+  z-index: 10001; /* below the step (10002), above page */
 }
 
 /* --- Bulk Upload Controls --- */
@@ -8329,9 +8499,11 @@ kbd {
   border-radius: 12px;
   padding: 0;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  z-index: 10001;
+  z-index: 10002;
   max-width: 350px;
+  min-width: 300px;
   animation: tourStepSlideIn 0.3s ease-out;
+  pointer-events: auto;
 }
 
 @keyframes tourStepSlideIn {
@@ -8351,26 +8523,7 @@ kbd {
   transform: translate(-50%, -50%);
 }
 
-.guided-tour-step.top-right {
-  top: 80px;
-  right: 20px;
-}
-
-.guided-tour-step.top-left {
-  top: 80px;
-  left: 20px;
-}
-
-.guided-tour-step.bottom {
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.guided-tour-step.bottom-right {
-  bottom: 80px;
-  right: 20px;
-}
+/* Position-specific styles removed - handled by JavaScript positioning */
 
 .tour-step-content {
   padding: 20px;
@@ -8599,3 +8752,5 @@ kbd {
     min-width: 140px;
   }
 }
+
+
