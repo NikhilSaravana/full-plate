@@ -384,7 +384,9 @@ const ReportsInterface = ({ distributionHistory }) => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
+    // Ensure the date is treated as local time, not UTC
+    const date = new Date(dateString + 'T00:00:00');
+    return date.toLocaleDateString();
   };
 
   const formatWeight = (weight) => {
