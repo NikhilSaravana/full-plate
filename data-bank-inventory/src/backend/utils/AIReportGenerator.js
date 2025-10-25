@@ -302,7 +302,7 @@ const AIReportGenerator = ({ inventoryData, distributionData, surveyData }) => {
   return (
     <div className="ai-report-generator">
       <div className="ai-header">
-        <h2>🤖 AI-Powered Report Generator</h2>
+        <h2>AI-Powered Report Generator</h2>
         <p>Get intelligent insights and recommendations based on your data patterns</p>
       </div>
 
@@ -319,7 +319,7 @@ const AIReportGenerator = ({ inventoryData, distributionData, surveyData }) => {
             </>
           ) : (
             <>
-              🧠 Generate AI Recommendations
+              Generate AI Recommendations
             </>
           )}
         </button>
@@ -327,7 +327,7 @@ const AIReportGenerator = ({ inventoryData, distributionData, surveyData }) => {
 
       {recommendations && (
         <div className="ai-recommendations">
-          <h3>🎯 AI Recommendations</h3>
+          <h3>AI Recommendations</h3>
           <div className="recommendations-grid">
             {recommendations.map((rec, index) => (
               <div key={index} className={`recommendation-card ${rec.type}`}>
@@ -366,11 +366,11 @@ const AIReportGenerator = ({ inventoryData, distributionData, surveyData }) => {
 
       {analysisData && (
         <div className="ai-analysis-data">
-          <h3>📊 Data Analysis Summary</h3>
+          <h3>Data Analysis Summary</h3>
           <div className="analysis-grid">
             {analysisData.inventory && (
               <div className="analysis-section">
-                <h4>📦 Inventory Analysis</h4>
+                <h4>Inventory Analysis</h4>
                 <ul>
                   <li>Total Items: {analysisData.inventory.totalItems}</li>
                   <li>Total Weight: {analysisData.inventory.totalWeight.toFixed(0)} lbs</li>
@@ -382,7 +382,7 @@ const AIReportGenerator = ({ inventoryData, distributionData, surveyData }) => {
             
             {analysisData.distribution && (
               <div className="analysis-section">
-                <h4>🚚 Distribution Analysis</h4>
+                <h4>Distribution Analysis</h4>
                 <ul>
                   <li>Total Distributions: {analysisData.distribution.totalDistributions}</li>
                   <li>Total Distributed: {analysisData.distribution.totalDistributed.toFixed(0)} lbs</li>
@@ -393,7 +393,7 @@ const AIReportGenerator = ({ inventoryData, distributionData, surveyData }) => {
             
             {analysisData.survey && (
               <div className="analysis-section">
-                <h4>👥 Demographics Analysis</h4>
+                <h4>Demographics Analysis</h4>
                 <ul>
                   <li>Total Recipients: {analysisData.survey.totalRecipients}</li>
                   <li>Primary Age Group: {analysisData.survey.mostCommonAgeGroup}</li>

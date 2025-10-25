@@ -51,7 +51,7 @@ const Login = () => {
           <p>Sign in to your account below</p>
           {/* {isFirebaseConfigured && (
             <div className="firebase-status">
-              ✅ Connected to Firebase Project
+              Connected to Firebase Project
             </div>
           )} */}
         </div>

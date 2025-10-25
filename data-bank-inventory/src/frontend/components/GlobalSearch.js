@@ -112,7 +112,7 @@ const GlobalSearch = ({ onSearch, placeholder = "Search everything..." }) => {
           onKeyDown={handleKeyDown}
           onFocus={() => query.length > 2 && setIsOpen(true)}
         />
-        <span className="search-icon">🔍</span>
+        <span className="search-icon"></span>
       </div>
 
       {isOpen && searchResults.length > 0 && (
@@ -152,7 +152,7 @@ const GlobalSearch = ({ onSearch, placeholder = "Search everything..." }) => {
       {isOpen && searchResults.length === 0 && query.length > 2 && (
         <div className="search-results">
           <div className="no-results">
-            <span className="no-results-icon">🔍</span>
+            <span className="no-results-icon"></span>
             <span>No results found for "{query}"</span>
           </div>
         </div>

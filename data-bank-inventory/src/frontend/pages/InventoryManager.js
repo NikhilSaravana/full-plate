@@ -269,7 +269,7 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, 
           {/* Detailed Items Section */}
           {!hasDetailedData && (
             <div className="no-detailed-items">
-              <h3>🔍 Detailed Item Tracking</h3>
+              <h3>Detailed Item Tracking</h3>
               <p>{t('inventory.detailed-management-note')}</p>
               <button
                 onClick={() => setShowAddForm(true)}

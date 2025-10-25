@@ -581,7 +581,7 @@ GRAIN, Rice, 1000, POUND, 2025-01-01</pre>
               fontSize: '16px',
               animation: 'fadeIn 0.3s ease-in'
             }}>
-              ✓ {successMessage}
+              {successMessage}
             </span>
           )}
           <button onClick={submitSurvey} className="btn btn-primary btn-large">
