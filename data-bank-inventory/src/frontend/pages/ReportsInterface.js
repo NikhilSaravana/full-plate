@@ -2,19 +2,66 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../backend/contexts/LanguageContext';
 import { useAuth } from '../../backend/contexts/AuthContext';
 import firestoreService from '../../backend/services/firestoreService';
-import SmartAnalytics from '../../backend/utils/SmartAnalytics';
+import TrendCharts from '../components/TrendCharts';
+import ForecastingDashboard from '../components/ForecastingDashboard';
+import { 
+  analyzeDistributionTrends,
+  analyzeInventoryTrends,
+  detectSeasonalPatterns,
+  analyzeDemographicTrends,
+  calculateEfficiencyMetrics
+} from '../../backend/utils/TrendAnalysis';
+import {
+  forecastDemand,
+  calculateInventoryTargets,
+  predictWaste,
+  assessInventoryRisk
+} from '../../backend/utils/ForecastingEngine';
 
-const ReportsInterface = ({ distributionHistory }) => {
+const ReportsInterface = ({ distributionHistory, currentInventory }) => {
   const { t } = useLanguage();
   const { currentUser } = useAuth();
+  const [activeView, setActiveView] = useState('trends'); // 'trends', 'forecast', 'reports'
+  const [dateRange, setDateRange] = useState(30);
+  
+  // Trend analysis state
+  const [distributionTrends, setDistributionTrends] = useState(null);
+  const [inventoryTrends, setInventoryTrends] = useState(null);
+  const [seasonalPatterns, setSeasonalPatterns] = useState(null);
+  const [demographicTrends, setDemographicTrends] = useState(null);
+  const [efficiencyMetrics, setEfficiencyMetrics] = useState(null);
+  
+  // Forecasting state
+  const [demandForecast, setDemandForecast] = useState(null);
+  const [inventoryTargets, setInventoryTargets] = useState(null);
+  const [wastePrediction, setWastePrediction] = useState(null);
+  const [riskAssessment, setRiskAssessment] = useState(null);
+  
+  // Reports state (existing)
   const [reportConfig, setReportConfig] = useState({
     startDate: '',
     endDate: '',
-    reportType: 'summary', // summary, detailed, ageGroups
+    reportType: 'summary',
     includeAgeGroups: true
   });
   const [generatedReport, setGeneratedReport] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Detailed inventory for waste prediction
+  const [detailedInventory, setDetailedInventory] = useState({});
+
+  // Load detailed inventory
+  useEffect(() => {
+    const savedDetailedInventory = localStorage.getItem('detailedInventory');
+    if (savedDetailedInventory) {
+      try {
+        setDetailedInventory(JSON.parse(savedDetailedInventory));
+      } catch (error) {
+        console.error('[ReportsInterface] Invalid JSON in localStorage:', error);
+        setDetailedInventory({});
+      }
+    }
+  }, []);
 
   // Set default date range (last 30 days)
   useEffect(() => {
@@ -28,6 +75,63 @@ const ReportsInterface = ({ distributionHistory }) => {
       endDate: endDate.toISOString().split('T')[0]
     }));
   }, []);
+
+  // Calculate trend analysis when data changes
+  useEffect(() => {
+    if (!distributionHistory || distributionHistory.length === 0) return;
+    
+    try {
+      // Distribution trends
+      const distTrends = analyzeDistributionTrends(distributionHistory, dateRange);
+      setDistributionTrends(distTrends);
+      
+      // Seasonal patterns
+      const seasonal = detectSeasonalPatterns(distributionHistory);
+      setSeasonalPatterns(seasonal);
+      
+      // Demographic trends
+      const demographics = analyzeDemographicTrends(distributionHistory, dateRange);
+      setDemographicTrends(demographics);
+      
+      // For inventory trends, we'd need historical snapshots
+      // For now, we'll leave it empty or show a message
+      setInventoryTrends({ trend: [], categoryTrends: {}, totalChange: 0, averageInventory: 0 });
+      
+    } catch (error) {
+      console.error('Error calculating trend analysis:', error);
+    }
+  }, [distributionHistory, dateRange]);
+
+  // Calculate forecasts when inventory/distribution data changes
+  useEffect(() => {
+    if (!currentInventory || !distributionHistory) return;
+    
+    try {
+      // Demand forecast
+      const forecast = forecastDemand(distributionHistory, 30);
+      setDemandForecast(forecast);
+      
+      // Inventory targets
+      if (forecast && forecast.forecast) {
+        const targets = calculateInventoryTargets(forecast, currentInventory, 7, 7);
+        setInventoryTargets(targets);
+      }
+      
+      // Waste prediction
+      if (Object.keys(detailedInventory).length > 0) {
+        const waste = predictWaste(detailedInventory, forecast);
+        setWastePrediction(waste);
+      }
+      
+      // Risk assessment
+      const stockoutPredictions = {}; // We'd calculate this from InventoryAnalytics
+      const risk = assessInventoryRisk(currentInventory, stockoutPredictions, wastePrediction);
+      setRiskAssessment(risk);
+      
+    } catch (error) {
+      console.error('Error calculating forecasts:', error);
+    }
+  }, [currentInventory, distributionHistory, detailedInventory]);
 
   const generateReport = () => {
     if (!reportConfig.startDate || !reportConfig.endDate) {
@@ -392,9 +496,101 @@ const ReportsInterface = ({ distributionHistory }) => {
   };
 
   return (
-    <div className="reports-interface">
-      <div className="form-container">
-        <h2>Generate Reports</h2>
+    <div className="reports-interface analytics-dashboard">
+      <div className="analytics-header">
+        <div className="header-content">
+          <h2>Analytics & Insights</h2>
+          <p className="header-subtitle">
+            Historical trends, predictive forecasting, and comprehensive reports
+          </p>
+        </div>
+      </div>
+
+      <nav className="analytics-nav">
+        <button 
+          className={`nav-item ${activeView === 'trends' ? 'active' : ''}`}
+          onClick={() => setActiveView('trends')}
+        >
+          <span className="nav-label">Trend Analysis</span>
+        </button>
+        <button 
+          className={`nav-item ${activeView === 'forecast' ? 'active' : ''}`}
+          onClick={() => setActiveView('forecast')}
+        >
+          <span className="nav-label">Forecasting</span>
+        </button>
+        <button 
+          className={`nav-item ${activeView === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveView('reports')}
+        >
+          <span className="nav-label">Reports</span>
+        </button>
+      </nav>
+
+      <div className="analytics-content">
+        {/* Trend Analysis View */}
+        {activeView === 'trends' && (
+          <div className="trends-view">
+            <div className="view-header">
+              <h3>Historical Trends & Patterns</h3>
+              <p className="view-description">
+                Analyze historical data to identify patterns, seasonal trends, and operational insights
+              </p>
+            </div>
+            
+            <TrendCharts
+              distributionTrends={distributionTrends}
+              inventoryTrends={inventoryTrends}
+              seasonalPatterns={seasonalPatterns}
+              demographicTrends={demographicTrends}
+            />
+
+            {efficiencyMetrics && (
+              <div className="efficiency-metrics-section">
+                <h3>Efficiency Metrics</h3>
+                <div className="metrics-grid">
+                  <div className="metric-card">
+                    <h4>Avg Distribution Size</h4>
+                    <p className="metric-value">{efficiencyMetrics.avgDistributionSize} lbs</p>
+                  </div>
+                  <div className="metric-card">
+                    <h4>Avg Clients per Distribution</h4>
+                    <p className="metric-value">{efficiencyMetrics.avgClientsPerDistribution}</p>
+                  </div>
+                  <div className="metric-card">
+                    <h4>Total Distributions</h4>
+                    <p className="metric-value">{efficiencyMetrics.totalDistributions}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Forecasting View */}
+        {activeView === 'forecast' && (
+          <div className="forecasting-view">
+            <div className="view-header">
+              <h3>Predictive Forecasting & Planning</h3>
+              <p className="view-description">
+                Data-driven predictions for demand, inventory targets, and waste prevention
+              </p>
+            </div>
+            
+            <ForecastingDashboard
+              demandForecast={demandForecast}
+              inventoryTargets={inventoryTargets}
+              wastePrediction={wastePrediction}
+              riskAssessment={riskAssessment}
+            />
+          </div>
+        )}
+
+        {/* Reports View (existing functionality) */}
+        {activeView === 'reports' && (
+          <div className="reports-view">
+            <div className="form-container">
+              <h3>Generate Reports</h3>
         
         {/* Report Configuration */}
         <div className="form-section">
@@ -607,13 +803,9 @@ const ReportsInterface = ({ distributionHistory }) => {
             </div>
           </div>
         )}
-        
-        {/* Smart Analytics */}
-        <SmartAnalytics 
-          inventoryData={[]} // You can pass actual inventory data here
-          distributionData={distributionHistory}
-          surveyData={[]} // You can pass actual survey data here
-        />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

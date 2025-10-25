@@ -684,6 +684,219 @@ class FirestoreService {
       window.removeEventListener('offline', handleOffline);
     };
   }
+
+  // ==========================================
+  // HISTORICAL SNAPSHOTS & ANALYTICS
+  // ==========================================
+
+  /**
+   * Save an inventory snapshot for trend analysis
+   * @param {string} userId - User ID
+   * @param {object} inventoryData - Current inventory state
+   * @returns {Promise<object>} Success/error result
+   */
+  async saveInventorySnapshot(userId, inventoryData) {
+    try {
+      const snapshotRef = collection(db, 'users', userId, 'inventorySnapshots');
+      const timestamp = new Date();
+      const dateKey = timestamp.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      await addDoc(snapshotRef, {
+        inventory: inventoryData,
+        timestamp: serverTimestamp(),
+        date: dateKey,
+        createdAt: serverTimestamp()
+      });
+
+      return { 
+        success: true, 
+        message: 'Inventory snapshot saved successfully',
+        timestamp 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: this.handleError(error, 'inventory snapshot save') 
+      };
+    }
+  }
+
+  /**
+   * Get inventory snapshots for trend analysis
+   * @param {string} userId - User ID
+   * @param {number} days - Number of days to retrieve (default 90)
+   * @returns {Promise<Array>} Array of inventory snapshots
+   */
+  async getInventorySnapshots(userId, days = 90) {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      const startDateString = startDate.toISOString().split('T')[0];
+
+      const snapshotsRef = collection(db, 'users', userId, 'inventorySnapshots');
+      const q = query(
+        snapshotsRef,
+        where('date', '>=', startDateString),
+        orderBy('date', 'desc'),
+        limit(days)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const snapshots = [];
+      
+      querySnapshot.forEach((doc) => {
+        snapshots.push({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
+        });
+      });
+
+      return snapshots;
+    } catch (error) {
+      console.error('Error getting inventory snapshots:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save calculated analytics metrics (cache to reduce computation)
+   * @param {string} userId - User ID
+   * @param {string} metricType - Type of metric (turnover, forecast, etc.)
+   * @param {object} metricData - Calculated metric data
+   * @returns {Promise<object>} Success/error result
+   */
+  async saveCalculatedMetric(userId, metricType, metricData) {
+    try {
+      const metricRef = doc(db, 'users', userId, 'calculatedMetrics', metricType);
+      
+      await setDoc(metricRef, {
+        ...metricData,
+        calculatedAt: serverTimestamp(),
+        lastUpdated: serverTimestamp()
+      }, { merge: true });
+
+      return { 
+        success: true, 
+        message: `${metricType} metric saved successfully` 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: this.handleError(error, 'calculated metric save') 
+      };
+    }
+  }
+
+  /**
+   * Get calculated analytics metric
+   * @param {string} userId - User ID
+   * @param {string} metricType - Type of metric to retrieve
+   * @returns {Promise<object|null>} Cached metric data or null
+   */
+  async getCalculatedMetric(userId, metricType) {
+    try {
+      const metricRef = doc(db, 'users', userId, 'calculatedMetrics', metricType);
+      const docSnap = await getDoc(metricRef);
+      
+      if (docSnap.exists()) {
+        return {
+          success: true,
+          data: docSnap.data(),
+          lastUpdated: docSnap.data().lastUpdated?.toDate()
+        };
+      } else {
+        return { 
+          success: true, 
+          data: null 
+        };
+      }
+    } catch (error) {
+      return { 
+        success: false, 
+        error: this.handleError(error, 'calculated metric load') 
+      };
+    }
+  }
+
+  /**
+   * Delete old inventory snapshots (cleanup to save storage)
+   * @param {string} userId - User ID
+   * @param {number} keepDays - Days to keep (default 180)
+   * @returns {Promise<object>} Success/error result
+   */
+  async cleanupOldSnapshots(userId, keepDays = 180) {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - keepDays);
+      const cutoffDateString = cutoffDate.toISOString().split('T')[0];
+
+      const snapshotsRef = collection(db, 'users', userId, 'inventorySnapshots');
+      const q = query(
+        snapshotsRef,
+        where('date', '<', cutoffDateString)
+      );
+
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        return { 
+          success: true, 
+          message: 'No old snapshots to clean up',
+          deletedCount: 0
+        };
+      }
+
+      const batch = writeBatch(db);
+      querySnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      await batch.commit();
+
+      return { 
+        success: true, 
+        message: `Deleted ${querySnapshot.size} old snapshots`,
+        deletedCount: querySnapshot.size
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: this.handleError(error, 'snapshot cleanup') 
+      };
+    }
+  }
+
+  /**
+   * Get aggregated analytics data for dashboard
+   * @param {string} userId - User ID
+   * @param {number} days - Number of days to analyze
+   * @returns {Promise<object>} Aggregated analytics data
+   */
+  async getAggregatedAnalytics(userId, days = 30) {
+    try {
+      const [snapshots, distributions, metrics] = await Promise.all([
+        this.getInventorySnapshots(userId, days),
+        this.getUserDistributions(userId, 100),
+        this.getCalculatedMetric(userId, 'turnover')
+      ]);
+
+      return {
+        success: true,
+        data: {
+          inventorySnapshots: snapshots,
+          recentDistributions: distributions,
+          cachedMetrics: metrics.data,
+          lastUpdated: new Date()
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.handleError(error, 'aggregated analytics load')
+      };
+    }
+  }
 }
 
 // Create singleton instance

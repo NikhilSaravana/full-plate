@@ -1,29 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../backend/contexts/LanguageContext';
-import { getMyPlateCategory } from '../../backend/utils/FoodCategoryMapper';
-import { getUnitConverters } from './UnitConfiguration';
-import { getCombinedAlerts } from '../../backend/utils/alertUtils';
+import TurnoverDashboard from '../components/TurnoverDashboard';
+import StockoutPredictor from '../components/StockoutPredictor';
+import RestockingRecommender from '../components/RestockingRecommender';
+import ExpirationCalendar from '../components/ExpirationCalendar';
+import { 
+  calculateTurnoverRate,
+  predictStockouts,
+  generateRestockingRecommendations,
+  identifySlowMovingItems,
+  analyzeSourcePerformance,
+  calculateSpaceUtilization
+} from '../../backend/utils/InventoryAnalytics';
 
-// High-level categories for consistency
-const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
-
-const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, unitConfig }) => {
+const InventoryManager = ({ 
+  currentInventory, 
+  onNavigate, 
+  outgoingMetrics = {},
+  unitConfig,
+  distributionHistory = []
+}) => {
   const { t } = useLanguage();
+  const [activeSection, setActiveSection] = useState('turnover');
   const [detailedInventory, setDetailedInventory] = useState({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [newItem, setNewItem] = useState({
-    foodType: '',
-    product: '',
-    quantity: '',
-    unit: 'POUNDS',
-    expirationDate: '',
-    source: 'Direct Donation',
-    notes: ''
+  const [turnoverData, setTurnoverData] = useState({});
+  const [stockoutPredictions, setStockoutPredictions] = useState({});
+  const [restockingRecommendations, setRestockingRecommendations] = useState([]);
+  const [slowMovingItems, setSlowMovingItems] = useState([]);
+  const [sourcePerformance, setSourcePerformance] = useState({});
+  const [spaceUtilization, setSpaceUtilization] = useState(null);
+  const [stockoutTimeframe, setStockoutTimeframe] = useState(7);
+  const [restockingSettings, setRestockingSettings] = useState({ 
+    leadTimeDays: 7, 
+    safetyStockDays: 7 
   });
-  const [showAddForm, setShowAddForm] = useState(false);
-
-  const unitConverters = getUnitConverters(unitConfig);
 
   // Load detailed inventory from localStorage
   useEffect(() => {
@@ -32,189 +42,128 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, 
       try {
         setDetailedInventory(JSON.parse(savedDetailedInventory));
       } catch (error) {
-        console.error('[InventoryManager] Invalid JSON in localStorage, resetting inventory:', error);
-        localStorage.removeItem('detailedInventory'); // Clean up corrupted data
+        console.error('[InventoryManager] Invalid JSON in localStorage:', error);
         setDetailedInventory({});
       }
     }
   }, []);
 
-  // Save detailed inventory to localStorage whenever it changes with quota handling
+  // Calculate all analytics when data changes
   useEffect(() => {
-    if (Object.keys(detailedInventory).length > 0) {
-      try {
-        localStorage.setItem('detailedInventory', JSON.stringify(detailedInventory));
-      } catch (error) {
-        console.error('[InventoryManager] Failed to save to localStorage:', error);
-        if (error.name === 'QuotaExceededError') {
-          // Try to free up space by removing old data
-          const keysToRemove = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('old_') || key.includes('backup_')) {
-              keysToRemove.push(key);
-            }
-          }
-          keysToRemove.forEach(key => localStorage.removeItem(key));
-          
-          // Try again after cleanup
-          try {
-            localStorage.setItem('detailedInventory', JSON.stringify(detailedInventory));
-          } catch (retryError) {
-            console.error('[InventoryManager] Storage quota exceeded even after cleanup');
-            alert('Storage space is full. Some data may not be saved locally.');
-          }
-        }
+    calculateAnalytics();
+  }, [currentInventory, distributionHistory, detailedInventory, stockoutTimeframe, restockingSettings]);
+
+  const calculateAnalytics = () => {
+    if (!currentInventory || !distributionHistory) return;
+
+    // Calculate turnover data
+    const turnover = {};
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+    const recentDistributions = distributionHistory.filter(dist => {
+      const distDate = parseDistributionDate(dist);
+      return distDate && distDate >= thirtyDaysAgo;
+    });
+
+    Object.entries(currentInventory).forEach(([category, stock]) => {
+      // Calculate total distributed for this category
+      const totalDistributed = recentDistributions.reduce((sum, dist) => {
+        return sum + (dist.categoryTotals?.[category] || 0);
+    }, 0);
+
+      turnover[category] = calculateTurnoverRate(stock, totalDistributed, 30);
+    });
+
+    setTurnoverData(turnover);
+
+    // Calculate stockout predictions
+    const predictions = predictStockouts(
+      currentInventory, 
+      distributionHistory, 
+      stockoutTimeframe
+    );
+    setStockoutPredictions(predictions);
+
+    // Generate restocking recommendations
+    const recommendations = generateRestockingRecommendations(
+      currentInventory,
+      turnover,
+      predictions,
+      restockingSettings.leadTimeDays,
+      restockingSettings.safetyStockDays
+    );
+    setRestockingRecommendations(recommendations);
+
+    // Identify slow-moving items
+    const slowMoving = identifySlowMovingItems(detailedInventory, distributionHistory);
+    setSlowMovingItems(slowMoving);
+
+    // Analyze source performance
+    const sources = analyzeSourcePerformance(detailedInventory, []);
+    setSourcePerformance(sources);
+
+    // Calculate space utilization
+    const space = calculateSpaceUtilization(currentInventory, unitConfig);
+    setSpaceUtilization(space);
+  };
+
+  const parseDistributionDate = (dist) => {
+    if (dist.createdAt && dist.createdAt.toDate) {
+      return dist.createdAt.toDate();
+    } else if (dist.createdAt && typeof dist.createdAt === 'string') {
+      return new Date(dist.createdAt);
+    } else if (dist.timestamp) {
+      return new Date(dist.timestamp);
+    } else if (dist.date) {
+      if (typeof dist.date === 'string' && dist.date.includes('-')) {
+        return new Date(dist.date + 'T00:00:00');
+      } else {
+        return new Date(dist.date);
       }
     }
-  }, [detailedInventory]);
+    return null;
+  };
 
-  const getTotalDetailedInventory = () => {
-    return Object.values(detailedInventory).reduce((sum, category) => {
-      return sum + (category?.total || 0);
-    }, 0);
+  const handleStockoutTimeframeChange = (days) => {
+    setStockoutTimeframe(days);
+  };
+
+  const handleRestockingSettingsChange = (settings) => {
+    setRestockingSettings(settings);
   };
 
   const totalFromSummary = Object.values(currentInventory || {}).reduce((sum, val) => sum + val, 0);
 
-  // Generate combined alerts with proper outgoingMetrics
-  const combinedAlerts = getCombinedAlerts({
-    currentInventory,
-    memoizedTotalInventory: totalFromSummary, // Use summary total for consistency
-    outgoingMetrics,
-    detailedInventory,
-    UnitConverters: unitConverters
-  });
-
-  const handleAddItem = () => {
-    if (!newItem.foodType || !newItem.quantity) {
-      alert('Please fill in required fields');
-      return;
-    }
-
-    const numQuantity = parseFloat(newItem.quantity);
-    if (isNaN(numQuantity) || numQuantity <= 0) {
-      alert('Please enter a valid positive quantity');
-      return;
-    }
-
-    const category = newItem.foodType; // Already a category
-    const weightInPounds = unitConverters.convertToStandardWeight(
-      numQuantity, 
-      newItem.unit, 
-      category
-    );
-
-    const itemData = {
-      id: Date.now(),
-              name: newItem.product || newItem.foodType,
-      weight: weightInPounds,
-      originalQuantity: numQuantity,
-      originalUnit: newItem.unit,
-      expiration: newItem.expirationDate || 'N/A',
-      source: newItem.source,
-      notes: newItem.notes || ''
-    };
-
-    setDetailedInventory(prev => ({
-      ...prev,
-      [category]: {
-        items: [itemData, ...(prev[category]?.items || [])],
-        total: (prev[category]?.total || 0) + weightInPounds
-      }
-    }));
-
-    setNewItem({
-      foodType: '',
-      product: '',
-      quantity: '',
-      unit: 'POUNDS',
-      expirationDate: '',
-      source: 'Direct Donation',
-      notes: ''
-    });
-    setShowAddForm(false);
-  };
-
-  const handleRemoveItem = (category, itemId) => {
-    setDetailedInventory(prev => {
-      const categoryData = prev[category];
-      if (!categoryData) return prev;
-
-      const itemToRemove = categoryData.items.find(item => item.id === itemId);
-      if (!itemToRemove) return prev;
-
-      return {
-        ...prev,
-        [category]: {
-          ...categoryData,
-          items: categoryData.items.filter(item => item.id !== itemId),
-          total: categoryData.total - itemToRemove.weight
-        }
-      };
-    });
-  };
-
-  const filteredInventory = () => {
-    let filtered = { ...detailedInventory };
-    
-    if (selectedCategory !== 'ALL') {
-      filtered = { [selectedCategory]: detailedInventory[selectedCategory] || { items: [], total: 0 } };
-    }
-    
-    if (searchTerm) {
-      Object.keys(filtered).forEach(category => {
-        if (filtered[category] && filtered[category].items) {
-          filtered[category] = {
-            ...filtered[category],
-            items: filtered[category].items.filter(item =>
-              item.name.toLowerCase().includes(searchTerm.toLowerCase())
-            )
-          };
-        }
-      });
-    }
-    
-    return filtered;
-  };
-
-  // Update getCriticalAlerts and getWarningAlerts to use 'type' for all alerts
-  const getCriticalAlerts = () => combinedAlerts.filter(alert => alert.type === 'CRITICAL');
-  const getWarningAlerts = () => combinedAlerts.filter(alert => alert.type === 'WARNING');
-  const getInfoAlerts = () => combinedAlerts.filter(alert => alert.type === 'INFO');
-
-  const getDisplayUnits = (item, category) => {
-    const unitConfig = unitConverters.getAvailableUnits().find(u => u.key === item.originalUnit);
-    if (!unitConfig) return `${item.weight.toLocaleString()} lbs`;
-    
-    return `${item.originalQuantity} ${unitConfig.abbreviation} (${item.weight.toLocaleString()} lbs)`;
-  };
-
-  const getPalletEquivalent = (weight, category) => {
-    return unitConverters.convertFromStandardWeight(weight, 'PALLET', category).toFixed(1);
-  };
-
-  const hasDetailedData = Object.values(detailedInventory).some(category => 
-    category && category.items && category.items.length > 0
-  );
-
   return (
-    <div className="inventory-manager">
-      <div className="inventory-header">
-        <h2>{t('inventory.title')}</h2>
-        <div className="inventory-stats">
-          <div className="stat-card">
-            <h4>{t('inventory.total-weight')}</h4>
-            <p>{totalFromSummary.toLocaleString()} lbs</p>
+    <div className="inventory-manager-operational">
+      <div className="operational-header">
+        <div className="header-content">
+          <h2>Inventory Operational Intelligence</h2>
+          <p className="header-subtitle">
+            Predictive planning and restocking recommendations powered by your distribution data
+          </p>
+        </div>
+        
+        <div className="header-stats-bar">
+          <div className="stat-item">
+            <span className="stat-label">Total Inventory:</span>
+            <span className="stat-value">{totalFromSummary.toLocaleString()} lbs</span>
           </div>
-          <div className="stat-card critical">
-            <h4>{t('stats.critical-alerts')}</h4>
-            <p>{getCriticalAlerts().length}</p>
+          {spaceUtilization && (
+            <>
+              <div className="stat-item">
+                <span className="stat-label">Warehouse Utilization:</span>
+                <span className={`stat-value utilization-${spaceUtilization.status}`}>
+                  {spaceUtilization.utilizationPercentage}%
+                </span>
           </div>
-          <div className="stat-card warning">
-            <h4>{t('stats.warnings')}</h4>
-            <p>{getWarningAlerts().length}</p>
+              <div className="stat-item">
+                <span className="stat-label">Total Pallets:</span>
+                <span className="stat-value">{spaceUtilization.totalPallets}</span>
           </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -223,218 +172,229 @@ const InventoryManager = ({ currentInventory, onNavigate, outgoingMetrics = {}, 
                           <h3>{t('empty.no-inventory')}</h3>
           <p>{t('empty.no-inventory-desc')}</p>
           <button
-            onClick={() => onNavigate('survey')}
-            className="get-started-btn"
+            onClick={() => onNavigate('dataentry')}
+            className="btn btn-primary btn-large"
           >
 {t('empty.start-adding')}
           </button>
         </div>
       ) : (
         <>
-          {/* Summary Section */}
-          <div className="inventory-summary">
-            <h3>{t('inventory.detailed-items')}</h3>
-            <div className="summary-grid">
-              {Object.entries(currentInventory || {})
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([category, weight]) => (
-                <div key={category} className="summary-card">
-                  <h4>{category}</h4>
-                  <p className="summary-weight">{weight.toLocaleString()} lbs</p>
-                  <p className="summary-percentage">
-                    {totalFromSummary > 0 ? ((weight / totalFromSummary) * 100).toFixed(1) : 0}%
-                  </p>
+          <nav className="operational-nav">
+            <button 
+              className={`nav-item ${activeSection === 'turnover' ? 'active' : ''}`}
+              onClick={() => setActiveSection('turnover')}
+            >
+              <span className="nav-label">Turnover Analysis</span>
+            </button>
+            <button 
+              className={`nav-item ${activeSection === 'stockout' ? 'active' : ''}`}
+              onClick={() => setActiveSection('stockout')}
+            >
+              <span className="nav-label">Stockout Predictions</span>
+              {Object.values(stockoutPredictions).filter(p => p.urgency === 'critical' || p.urgency === 'high').length > 0 && (
+                <span className="nav-badge critical">
+                  {Object.values(stockoutPredictions).filter(p => p.urgency === 'critical' || p.urgency === 'high').length}
+                </span>
+              )}
+            </button>
+              <button
+              className={`nav-item ${activeSection === 'restocking' ? 'active' : ''}`}
+              onClick={() => setActiveSection('restocking')}
+            >
+              <span className="nav-label">Restocking Plan</span>
+              {restockingRecommendations.length > 0 && (
+                <span className="nav-badge">
+                  {restockingRecommendations.length}
+                </span>
+              )}
+              </button>
+            <button 
+              className={`nav-item ${activeSection === 'expiration' ? 'active' : ''}`}
+              onClick={() => setActiveSection('expiration')}
+            >
+              <span className="nav-label">Expiration Timeline</span>
+            </button>
+            <button
+              className={`nav-item ${activeSection === 'advanced' ? 'active' : ''}`}
+              onClick={() => setActiveSection('advanced')}
+            >
+              <span className="nav-label">Advanced Insights</span>
+            </button>
+          </nav>
+
+          <div className="operational-content">
+            {activeSection === 'turnover' && (
+              <TurnoverDashboard turnoverData={turnoverData} />
+            )}
+
+            {activeSection === 'stockout' && (
+              <StockoutPredictor 
+                predictions={stockoutPredictions}
+                onTimeframeChange={handleStockoutTimeframeChange}
+              />
+            )}
+
+            {activeSection === 'restocking' && (
+              <RestockingRecommender 
+                recommendations={restockingRecommendations}
+                onSettingsChange={handleRestockingSettingsChange}
+              />
+            )}
+
+            {activeSection === 'expiration' && (
+              <ExpirationCalendar detailedInventory={detailedInventory} />
+            )}
+
+            {activeSection === 'advanced' && (
+              <div className="advanced-insights">
+                <h3>Advanced Operational Insights</h3>
+
+                {/* Slow-Moving Items */}
+                {slowMovingItems.length > 0 && (
+                  <div className="insight-section">
+                    <h4>Slow-Moving Items ({slowMovingItems.length})</h4>
+                    <p className="section-description">
+                      Items that have been in inventory for extended periods. Consider targeted distribution campaigns.
+                    </p>
+                    <div className="slow-moving-grid">
+                      {slowMovingItems.slice(0, 10).map((item, index) => (
+                        <div key={index} className={`slow-moving-card urgency-${item.urgency}`}>
+                          <div className="card-header">
+                            <strong>{item.name}</strong>
+                            <span className="category-badge">{item.category}</span>
+                          </div>
+                          <div className="card-details">
+                            <div className="detail-row">
+                              <span>Weight:</span>
+                              <span>{Math.round(item.weight)} lbs</span>
+                            </div>
+                            <div className="detail-row">
+                              <span>Age:</span>
+                              <span>{item.age} days</span>
+              </div>
+                            {item.daysUntilExpiry && (
+                              <div className="detail-row">
+                                <span>Expires in:</span>
+                                <span>{item.daysUntilExpiry} days</span>
+            </div>
+          )}
+                          </div>
+                          <div className="card-recommendation">
+                            {item.recommendation}
+                          </div>
                 </div>
               ))}
             </div>
+                    {slowMovingItems.length > 10 && (
+                      <p className="show-more">+ {slowMovingItems.length - 10} more slow-moving items</p>
+                    )}
           </div>
+                )}
 
-          {/* Alerts Section */}
-          {combinedAlerts.length > 0 && (
-            <div className="alerts-section">
-              <h3>{t('dashboard.critical-alerts-warnings')}</h3>
-              <div className="alerts-list">
-                {combinedAlerts.map((alert, index) => (
-                  <div key={index} className={`alert alert-${alert.type.toLowerCase()}`}> 
-                    <span className="alert-icon">{alert.type}</span>
-                    <span className="alert-message">{alert.message}</span>
-                    {alert.action && <span className="alert-action">{alert.action}</span>}
-                    {alert.item && <span className="alert-weight">{alert.item.weight} lbs</span>}
+                {/* Source Performance */}
+                {Object.keys(sourcePerformance).length > 0 && (
+                  <div className="insight-section">
+                    <h4>Source/Donor Performance</h4>
+                    <p className="section-description">
+                      Analysis of food sources based on volume, shelf life, and variety.
+                    </p>
+                    <div className="source-performance-grid">
+                      {Object.entries(sourcePerformance)
+                        .sort((a, b) => b[1].totalWeight - a[1].totalWeight)
+                        .slice(0, 8)
+                        .map(([source, metrics]) => (
+                        <div key={source} className="source-card">
+                          <h5>{source}</h5>
+                          <div className="source-metrics">
+                            <div className="metric">
+                              <span className="metric-label">Total Weight:</span>
+                              <span className="metric-value">{Math.round(metrics.totalWeight).toLocaleString()} lbs</span>
+                            </div>
+                            <div className="metric">
+                              <span className="metric-label">Items:</span>
+                              <span className="metric-value">{metrics.itemCount}</span>
+                            </div>
+                            <div className="metric">
+                              <span className="metric-label">Avg Shelf Life:</span>
+                              <span className="metric-value">{metrics.avgShelfLife} days</span>
+                            </div>
+                            <div className="metric">
+                              <span className="metric-label">Categories:</span>
+                              <span className="metric-value">{Object.keys(metrics.categories).length}</span>
+                            </div>
+                          </div>
+                          <div className="source-reliability">
+                            <div className="reliability-bar">
+                              <div 
+                                className="reliability-fill"
+                                style={{ width: `${metrics.reliabilityScore}%` }}
+                              ></div>
+                            </div>
+                            <span className="reliability-score">
+                              Reliability: {metrics.reliabilityScore}/100
+                            </span>
+                          </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Detailed Items Section */}
-          {!hasDetailedData && (
-            <div className="no-detailed-items">
-              <h3>Detailed Item Tracking</h3>
-              <p>{t('inventory.detailed-management-note')}</p>
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="add-detailed-btn"
-              >
-                Start Detailed Tracking
-              </button>
+                {/* Space Utilization Detail */}
+                {spaceUtilization && (
+                  <div className="insight-section">
+                    <h4>Warehouse Space Utilization</h4>
+                    <div className={`space-utilization-card status-${spaceUtilization.status}`}>
+                      <div className="utilization-header">
+                        <div className="utilization-chart">
+                          <div className="chart-circle">
+                            <span className="chart-percentage">{spaceUtilization.utilizationPercentage}%</span>
             </div>
-          )}
-
-          {/* Controls */}
-          <div className="inventory-controls">
-            <div className="search-filter">
-              <input
-                type="text"
-                placeholder="Search items..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
-              />
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="category-filter"
-              >
-                <option value="ALL">{t('inventory.all-categories')}</option>
-                <option value="DAIRY">{t('category.dairy')}</option>
-                <option value="GRAIN">{t('category.grain')}</option>
-                <option value="PROTEIN">{t('category.protein')}</option>
-                <option value="VEG">{t('category.vegetables')}</option>
-                <option value="FRUIT">{t('category.fruit')}</option>
-                <option value="PRODUCE">{t('category.produce')}</option>
-                <option value="MISC">{t('category.misc')}</option>
-              </select>
             </div>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="add-item-btn"
-            >
-              + Add Individual Item
-            </button>
+                        <div className="utilization-stats">
+                          <div className="stat">
+                            <span className="stat-label">Current Capacity:</span>
+                            <span className="stat-value">{spaceUtilization.totalWeight.toLocaleString()} lbs</span>
           </div>
-
-          {/* Add Item Form */}
-          {showAddForm && (
-            <div className="add-item-form">
-              <h3>Add Individual Inventory Item</h3>
-              <div className="form-grid">
-                <select
-                  value={newItem.foodType}
-                  onChange={(e) => setNewItem({...newItem, foodType: e.target.value})}
-                >
-                  <option value="">Select Category</option>
-                  {MAIN_FOOD_CATEGORIES.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  placeholder="Product name (e.g., White Bread, 2% Milk)"
-                  value={newItem.product}
-                  onChange={(e) => setNewItem({...newItem, product: e.target.value})}
-                />
-                <input
-                  type="number"
-                  step="0.1"
-                  placeholder="Quantity"
-                  value={newItem.quantity}
-                  onChange={(e) => setNewItem({...newItem, quantity: e.target.value})}
-                />
-                <select
-                  value={newItem.unit}
-                  onChange={(e) => setNewItem({...newItem, unit: e.target.value})}
-                >
-                  {unitConverters.getAvailableUnits().map(unit => (
-                    <option key={unit.key} value={unit.key}>
-                      {unit.name} ({unit.abbreviation})
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="date"
-                  placeholder="Expiration Date"
-                  value={newItem.expirationDate}
-                  onChange={(e) => setNewItem({...newItem, expirationDate: e.target.value})}
-                />
-                <select
-                  value={newItem.source}
-                  onChange={(e) => setNewItem({...newItem, source: e.target.value})}
-                >
-                  <option value="Direct Donation">Direct Donation</option>
-                  <option value="NTFB AE">NTFB AE</option>
-                  <option value="Local Farm">Local Farm</option>
-                  <option value="Food Drive">Food Drive</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="Notes (optional)"
-                  value={newItem.notes}
-                  onChange={(e) => setNewItem({...newItem, notes: e.target.value})}
-                />
+                          <div className="stat">
+                            <span className="stat-label">Max Capacity:</span>
+                            <span className="stat-value">{spaceUtilization.totalWarehouseCapacity.toLocaleString()} lbs</span>
               </div>
-              
-              {newItem.quantity && newItem.unit && newItem.foodType && (
-                <div className="preview-conversion">
-                  <p><strong>Preview:</strong> {newItem.quantity} {unitConverters.getAvailableUnits().find(u => u.key === newItem.unit)?.abbreviation} = {
-                    (() => {
-                      const numQuantity = parseFloat(newItem.quantity);
-                      if (isNaN(numQuantity) || numQuantity <= 0) return '0.0';
-                      return unitConverters.convertToStandardWeight(
-                        numQuantity, 
-                        newItem.unit, 
-                        newItem.foodType
-                      ).toFixed(1);
-                    })()
-                  } lbs</p>
+                          <div className="stat">
+                            <span className="stat-label">Total Pallets:</span>
+                            <span className="stat-value">{spaceUtilization.totalPallets}</span>
                 </div>
-              )}
-              
-              <div className="form-actions">
-                <button onClick={handleAddItem} className="add-btn">{t('inventory.add-new-item')}</button>
-                <button onClick={() => setShowAddForm(false)} className="cancel-btn">{t('ui.cancel')}</button>
               </div>
             </div>
-          )}
-
-          {/* Detailed Inventory Display */}
-          {hasDetailedData && (
-            <div className="inventory-display">
-              <h3>Detailed Item Tracking</h3>
-              {Object.entries(filteredInventory()).map(([category, data]) => {
-                if (!data || !data.items || data.items.length === 0) return null;
-                
-                return (
-                  <div key={category} className="category-section">
-                    <div className="category-header">
-                      <h4>{category}</h4>
-                      <span className="category-total">{data.total.toLocaleString()} lbs</span>
+                      <div className="utilization-recommendation">
+                        <strong>Recommendation:</strong> {spaceUtilization.recommendation}
                     </div>
-                    <div className="items-grid">
-                      {data.items.map(item => (
-                        <div key={item.id} className="item-card">
-                          <div className="item-info">
-                            <h5>{item.name}</h5>
-                            <p className="item-weight">{getDisplayUnits(item, category)}</p>
-                            <p className="item-pallets">{getPalletEquivalent(item.weight, category)} pallets equiv.</p>
-                            <p className="item-expiration">Exp: {item.expiration}</p>
-                            <p className="item-source">Source: {item.source}</p>
-                            {item.notes && <p className="item-notes">Notes: {item.notes}</p>}
-                          </div>
-                          <button
-                            onClick={() => handleRemoveItem(category, item.id)}
-                            className="remove-btn"
-                            title="Remove item"
-                          >
-                            ✕
-                          </button>
+                      <div className="utilization-by-category">
+                        <h5>Space by Category (Pallets)</h5>
+                        <div className="category-pallets-grid">
+                          {Object.entries(spaceUtilization.categoryPallets).map(([category, data]) => (
+                            <div key={category} className="category-pallet-item">
+                              <span className="category-name">{category}</span>
+                              <span className="pallet-count">{data.pallets} pallets</span>
+                              <span className="pallet-percentage">{data.percentage.toFixed(1)}%</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                );
-              })}
+                    </div>
+                  </div>
+                )}
+
+                {slowMovingItems.length === 0 && Object.keys(sourcePerformance).length === 0 && (
+                  <div className="no-advanced-data">
+                    <p>Advanced insights require detailed inventory tracking with expiration dates and sources.</p>
+                    <p className="subtitle">Use the Food Intake tab to add detailed item information.</p>
+                  </div>
+                )}
             </div>
           )}
+          </div>
         </>
       )}
     </div>

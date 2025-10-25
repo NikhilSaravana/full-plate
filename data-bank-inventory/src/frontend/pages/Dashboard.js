@@ -1254,6 +1254,48 @@ System Health Check:
     }
   }, [currentUser, connectionStatus.connected]);
 
+  // Save daily inventory snapshots for trend analysis
+  useEffect(() => {
+    if (!currentUser || !connectionStatus.connected) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const lastSnapshotKey = `lastSnapshot_${currentUser.uid}`;
+    const lastSnapshotDate = localStorage.getItem(lastSnapshotKey);
+
+    // Only save one snapshot per day
+    if (lastSnapshotDate !== today && Object.values(currentInventory).some(val => val > 0)) {
+      firestoreService.saveInventorySnapshot(currentUser.uid, currentInventory)
+        .then(result => {
+          if (result.success) {
+            localStorage.setItem(lastSnapshotKey, today);
+            console.log('Daily inventory snapshot saved for trend analysis');
+          }
+        })
+        .catch(error => {
+          console.error('Error saving inventory snapshot:', error);
+        });
+    }
+
+    // Cleanup old snapshots once a week (keep 180 days)
+    const lastCleanupKey = `lastCleanup_${currentUser.uid}`;
+    const lastCleanup = localStorage.getItem(lastCleanupKey);
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    if (!lastCleanup || new Date(lastCleanup) < oneWeekAgo) {
+      firestoreService.cleanupOldSnapshots(currentUser.uid, 180)
+        .then(result => {
+          if (result.success && result.deletedCount > 0) {
+            localStorage.setItem(lastCleanupKey, today);
+            console.log(`Cleaned up ${result.deletedCount} old snapshots`);
+          }
+        })
+        .catch(error => {
+          console.error('Error cleaning up old snapshots:', error);
+        });
+    }
+  }, [currentUser, currentInventory, connectionStatus.connected]);
+
   // Add state for detailedInventory
   const [detailedInventory, setDetailedInventory] = useState({});
 
@@ -1356,27 +1398,6 @@ System Health Check:
                  {t('btn.start-tour')}
               </button>
 
-              {/* Phase 7A: Enhanced Status Indicator */}
-              <div className="sync-status">
-                <div className={`status-indicator ${
-                  syncStatus === 'connected' ? 'status-good' : 
-                  syncStatus === 'syncing' ? 'status-warning' : 
-                  syncStatus === 'error' ? 'status-danger' : 'status-info'
-                }`}>
-
-                  <span>
-                    {syncStatus === 'connected' && 'Data Saved'}
-                    {syncStatus === 'syncing' && 'Saving...'}
-                    {syncStatus === 'disconnected' && 'Working Offline'}
-                    {syncStatus === 'error' && 'Save Error'}
-                  </span>
-                  {pendingChanges && (
-                    <span style={{ marginLeft: '8px', fontSize: '12px' }}>
-                      (Changes Pending)
-                    </span>
-                  )}
-                </div>
-              </div>
               <div className="user-profile">
                 <div className="user-info">
                   <span className="user-name">
@@ -1818,6 +1839,7 @@ System Health Check:
             onNavigate={setActiveTab}
             outgoingMetrics={outgoingMetrics}
             unitConfig={unitConfig}
+            distributionHistory={distributionHistory}
           />
         )}
 
@@ -1985,6 +2007,7 @@ System Health Check:
         {activeTab === 'reports' && (
           <ReportsInterface 
             distributionHistory={distributionHistory}
+            currentInventory={currentInventory}
           />
         )}
       </main>
