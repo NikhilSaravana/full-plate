@@ -38,29 +38,39 @@ const ReportsInterface = ({ distributionHistory }) => {
     setIsGenerating(true);
     
     try {
-      const startDate = new Date(reportConfig.startDate);
-      const endDate = new Date(reportConfig.endDate);
-      endDate.setHours(23, 59, 59, 999); // Include the entire end date
+      // Ensure dates are treated as local time to avoid timezone issues
+      const startDate = new Date(reportConfig.startDate + 'T00:00:00');
+      const endDate = new Date(reportConfig.endDate + 'T23:59:59');
 
       // Filter distributions within date range
       const filteredDistributions = distributionHistory.filter(dist => {
         let distDate = null;
-        if (dist.createdAt && dist.createdAt.toDate) {
+        
+        // Try to get the distribution date from various possible fields
+        if (dist.date) {
+          // Most distributions use the 'date' field in YYYY-MM-DD format
+          distDate = new Date(dist.date + 'T00:00:00');
+        } else if (dist.createdAt && dist.createdAt.toDate) {
           distDate = dist.createdAt.toDate();
         } else if (dist.createdAt && typeof dist.createdAt === 'string') {
           distDate = new Date(dist.createdAt);
         } else if (dist.timestamp) {
-          distDate = new Date(dist.timestamp);
-        } else if (dist.date) {
-          if (typeof dist.date === 'string' && dist.date.includes('-')) {
-            distDate = new Date(dist.date + 'T00:00:00');
+          // If timestamp is a date string, treat it as local time
+          if (typeof dist.timestamp === 'string' && dist.timestamp.includes('T')) {
+            distDate = new Date(dist.timestamp);
           } else {
-            distDate = new Date(dist.date);
+            distDate = new Date(dist.timestamp + 'T00:00:00');
           }
         }
         
         if (!distDate || isNaN(distDate.getTime())) return false;
-        return distDate >= startDate && distDate <= endDate;
+        
+        // Convert to date strings for comparison to avoid timezone issues
+        const distDateStr = distDate.toISOString().split('T')[0];
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        
+        return distDateStr >= startDateStr && distDateStr <= endDateStr;
       });
 
       // Calculate report data
