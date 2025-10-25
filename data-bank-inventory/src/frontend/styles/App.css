@@ -5525,8 +5525,8 @@ td {
   background: var(--bg-tertiary);
 }
 
-/* ===== AI REPORT GENERATOR STYLES ===== */
-.ai-report-generator {
+/* ===== SMART ANALYTICS STYLES ===== */
+.smart-analytics {
   background: var(--bg-secondary);
   border-radius: 12px;
   padding: 24px;
@@ -5534,29 +5534,29 @@ td {
   border: 1px solid var(--border-color);
 }
 
-.ai-header {
+.analytics-header {
   text-align: center;
   margin-bottom: 24px;
 }
 
-.ai-header h2 {
+.analytics-header h2 {
   color: var(--accent-primary);
   margin-bottom: 8px;
   font-size: 1.8rem;
 }
 
-.ai-header p {
+.analytics-header p {
   color: var(--text-secondary);
   font-size: 1.1rem;
 }
 
-.ai-controls {
+.analytics-controls {
   display: flex;
   justify-content: center;
   margin-bottom: 32px;
 }
 
-.ai-generate-btn {
+.analytics-generate-btn {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   color: white;
@@ -5571,12 +5571,12 @@ td {
   gap: 8px;
 }
 
-.ai-generate-btn:hover {
+.analytics-generate-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
 }
 
-.ai-generate-btn:disabled {
+.analytics-generate-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
@@ -5596,11 +5596,11 @@ td {
   100% { transform: rotate(360deg); }
 }
 
-.ai-recommendations {
+.analytics-recommendations {
   margin-bottom: 32px;
 }
 
-.ai-recommendations h3 {
+.analytics-recommendations h3 {
   color: var(--accent-primary);
   margin-bottom: 20px;
   font-size: 1.5rem;
@@ -5708,14 +5708,14 @@ td {
   color: var(--accent-primary);
 }
 
-.ai-analysis-data {
+.analytics-data {
   background: var(--bg-primary);
   border-radius: 12px;
   padding: 24px;
   border: 1px solid var(--border-color);
 }
 
-.ai-analysis-data h3 {
+.analytics-data h3 {
   color: var(--accent-primary);
   margin-bottom: 20px;
   font-size: 1.5rem;
@@ -5830,12 +5830,12 @@ td {
   color: var(--accent-primary);
 }
 
-[data-theme="dark"] .ai-analysis-data {
+[data-theme="dark"] .analytics-data {
   background: var(--bg-primary);
   border-color: var(--border-color);
 }
 
-[data-theme="dark"] .ai-analysis-data h3 {
+[data-theme="dark"] .analytics-data h3 {
   color: var(--accent-primary);
 }
 
@@ -7155,7 +7155,7 @@ td {
 .global-search {
   position: relative;
   width: 100%;
-  max-width: 400px;
+  max-width: 600px;
 }
 
 .search-input-container {

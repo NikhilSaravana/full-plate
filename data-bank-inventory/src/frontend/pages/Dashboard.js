@@ -1474,12 +1474,6 @@ System Health Check:
               placeholder="Search inventory, distributions, reports..."
             />
             <div className="tooltip-wrapper">
-              <button onClick={performSystemHealthCheck} className="btn btn-light" style={{ minWidth: 'auto', padding: '8px 12px' }}>
-                {t('btn.check')}
-            </button>
-              <div className="tooltip">{t('tooltip.system-health')}</div>
-            </div>
-            <div className="tooltip-wrapper">
               <button 
                 type="button"
                 onClick={(e) => {
@@ -2010,6 +2004,7 @@ System Health Check:
         isOpen={showTour || isTourRunning}
         onClose={handleCloseTour}
         onStartTour={handleStartTour}
+        onNavigate={setActiveTab}
       />
     </div>
     </>

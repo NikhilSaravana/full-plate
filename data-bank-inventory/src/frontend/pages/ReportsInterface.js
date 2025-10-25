@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../backend/contexts/LanguageContext';
 import { useAuth } from '../../backend/contexts/AuthContext';
 import firestoreService from '../../backend/services/firestoreService';
-import AIReportGenerator from '../../backend/utils/AIReportGenerator';
+import SmartAnalytics from '../../backend/utils/SmartAnalytics';
 
 const ReportsInterface = ({ distributionHistory }) => {
   const { t } = useLanguage();
@@ -608,8 +608,8 @@ const ReportsInterface = ({ distributionHistory }) => {
           </div>
         )}
         
-        {/* AI Report Generator */}
-        <AIReportGenerator 
+        {/* Smart Analytics */}
+        <SmartAnalytics 
           inventoryData={[]} // You can pass actual inventory data here
           distributionData={distributionHistory}
           surveyData={[]} // You can pass actual survey data here

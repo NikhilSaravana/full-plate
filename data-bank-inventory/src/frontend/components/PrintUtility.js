@@ -40,7 +40,7 @@ const PrintUtility = ({ onPrint }) => {
       className="btn btn-light"
       title="Print current view"
     >
-      🖨️ Print
+      Print
     </button>
   );
 };

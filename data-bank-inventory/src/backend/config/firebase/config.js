@@ -40,11 +40,11 @@ const firebaseConfig = (() => {
 // Log config
 if (process.env.NODE_ENV === 'development') {
   if (isUsingEnvVars) {
-    console.log('🔥 Firebase: Using environment variables from .env file');
-    console.log('📋 Project ID:', firebaseConfig.projectId);
+    console.log('Firebase: Using environment variables from .env file');
+    console.log('Project ID:', firebaseConfig.projectId);
   } else {
-    console.log('🔥 Firebase: Using demo configuration (localStorage only)');
-    console.log('💡 To use real Firebase, create a .env file with your Firebase credentials');
+    console.log('Firebase: Using demo configuration (localStorage only)');
+    console.log('To use real Firebase, create a .env file with your Firebase credentials');
   }
 }
 
@@ -53,10 +53,10 @@ let app;
 try {
   app = initializeApp(firebaseConfig);
   if (process.env.NODE_ENV === 'development') {
-    console.log('✅ Firebase initialized successfully');
+    console.log('Firebase initialized successfully');
   }
 } catch (error) {
-  console.error('❌ Firebase initialization failed:', error);
+  console.error('Firebase initialization failed:', error);
   throw error;
 }
 
@@ -71,9 +71,9 @@ if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_FIREBASE
   try {
     connectAuthEmulator(auth, "http://localhost:9099");
     connectFirestoreEmulator(db, 'localhost', 8080);
-    console.log('🔧 Connected to Firebase emulators');
+    console.log('Connected to Firebase emulators');
   } catch (error) {
-    console.log('⚠️ Firebase emulators already connected or not available');
+    console.log('Firebase emulators already connected or not available');
   }
 }
 

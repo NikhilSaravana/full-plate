@@ -515,7 +515,7 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
               fontSize: '16px',
               animation: 'fadeIn 0.3s ease-in'
             }}>
-              ✓ {successMessage}
+              {successMessage}
             </span>
           )}
           <button onClick={submitDistribution} className="btn btn-primary btn-large">
