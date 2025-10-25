@@ -106,6 +106,7 @@ const Dashboard = () => {
 
   // Enhanced Distribution Tracking
   const [distributionHistory, setDistributionHistory] = useState([]);
+  const [surveyHistory, setSurveyHistory] = useState([]);
   const [outgoingMetrics, setOutgoingMetrics] = useState({
     totalDistributedToday: 0,
     totalDistributedWeek: 0,
@@ -1016,6 +1017,19 @@ System Health Check:
       //   totalDistributedToday: prev.totalDistributedToday + (surveyData.totalDistributed || 0),
       //   clientsServedToday: prev.clientsServedToday + (surveyData.clientsServed || 0)
       // }));
+    } else if (surveyData.type === 'SINGLE' || surveyData.type === 'BULK') {
+      // Handle survey tracking
+      const surveyRecord = {
+        date: surveyData.date || new Date().toISOString().split('T')[0],
+        source: surveyData.source || 'Unknown',
+        type: surveyData.type,
+        categoryTotals: surveyData.categoryTotals || {},
+        items: surveyData.items || [],
+        notes: surveyData.notes || '',
+        timestamp: new Date().toISOString()
+      };
+      
+      setSurveyHistory(prev => [surveyRecord, ...prev]);
     }
 
     // Mark as no longer first time
@@ -1948,14 +1962,14 @@ System Health Check:
 
         {activeTab === 'dataentry' && (
           <div className="data-entry-tab">
-            <SurveyInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} successMessage={successMessage} />
+            <SurveyInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} successMessage={successMessage} surveyHistory={surveyHistory} />
             {/* Removed: Distribution log from Food Intake tab */}
           </div>
         )}
 
         {activeTab === 'distribution' && (
           <div className="distribution-tab">
-            <DistributionInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} successMessage={successMessage}/>
+            <DistributionInterface onDataSubmit={handleSurveySubmit} unitConfig={unitConfig} successMessage={successMessage} distributionHistory={distributionHistory}/>
           </div>
         )}
 

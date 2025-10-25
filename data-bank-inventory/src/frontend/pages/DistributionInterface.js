@@ -7,7 +7,7 @@ import { useLanguage } from '../../backend/contexts/LanguageContext';
 // High-level categories shown in the dropdown instead of the full 30+ list
 export const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
 
-const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
+const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage, distributionHistory = [] }) => {
   const { t } = useLanguage();
   const [formData, setFormData] = useState({
     date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
@@ -522,6 +522,94 @@ const DistributionInterface = ({ onDataSubmit, unitConfig, successMessage }) => 
             {t('distribution.submit-distribution')}
           </button>
         </div>
+
+        {/* Historical Distribution Items */}
+        {distributionHistory.length > 0 && (
+          <div className="historical-distribution-items" style={{ marginTop: '32px', padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+            <h4 style={{ margin: '0 0 16px 0', color: '#293c47', fontSize: '1.1em', fontWeight: '600' }}>
+              Previously Distributed Items ({distributionHistory.length} distributions)
+            </h4>
+            <div className="distributions-list" style={{ display: 'grid', gap: '16px' }}>
+              {distributionHistory.slice(0, 10).map((distribution, distributionIndex) => (
+                <div key={distributionIndex} className="distribution-card" style={{ 
+                  padding: '16px', 
+                  backgroundColor: 'white', 
+                  borderRadius: '8px', 
+                  border: '1px solid #dee2e6',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}>
+                  <div className="distribution-header" style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '12px',
+                    paddingBottom: '8px',
+                    borderBottom: '1px solid #e9ecef'
+                  }}>
+                    <div>
+                      <span style={{ fontWeight: '600', color: '#293c47' }}>
+                        {distribution.recipient || 'Unknown Recipient'}
+                      </span>
+                      <span style={{ color: '#6c757d', marginLeft: '8px' }}>
+                        {distribution.totalDistributed?.toFixed(1)} lbs
+                      </span>
+                      <span style={{ color: '#6c757d', marginLeft: '8px' }}>
+                        {distribution.clientsServed} clients
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.9em', color: '#6c757d' }}>
+                      {new Date(distribution.timestamp).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="distribution-items" style={{ display: 'grid', gap: '8px' }}>
+                    {distribution.items && distribution.items.length > 0 ? (
+                      distribution.items.map((item, itemIndex) => (
+                        <div key={itemIndex} className="historical-item" style={{ 
+                          padding: '8px 12px', 
+                          backgroundColor: '#f8f9fa', 
+                          borderRadius: '4px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div className="item-info">
+                            <span style={{ fontWeight: '500', color: '#293c47' }}>
+                              {item.product || 'Unnamed Item'}
+                            </span>
+                            <span style={{ color: '#6c757d', marginLeft: '8px' }}>
+                              {item.quantity} {item.unit}
+                            </span>
+                            {item.foodType && (
+                              <span style={{ 
+                                color: '#c4a464', 
+                                marginLeft: '8px', 
+                                fontSize: '0.8em',
+                                backgroundColor: 'rgba(196, 164, 100, 0.1)',
+                                padding: '2px 6px',
+                                borderRadius: '3px'
+                              }}>
+                                {item.foodType}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ color: '#6c757d', fontStyle: 'italic' }}>
+                        No items recorded
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {distributionHistory.length > 10 && (
+              <div style={{ marginTop: '12px', textAlign: 'center', color: '#6c757d', fontSize: '0.9em' }}>
+                Showing 10 of {distributionHistory.length} distributions
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
       

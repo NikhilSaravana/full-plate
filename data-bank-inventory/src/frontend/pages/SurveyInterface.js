@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 // High-level categories for simplified selection
 export const MAIN_FOOD_CATEGORIES = ['VEG', 'FRUIT', 'DAIRY', 'GRAIN', 'PROTEIN', 'PRODUCE', 'MISC'];
 
-const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage }) => {
+const SurveyInterface = ({ onDataSubmit, unitConfig, successMessage, surveyHistory = [] }) => {
   const { t } = useLanguage();
   const [surveyMode, setSurveyMode] = useState('SINGLE'); // SINGLE, BULK, DISTRIBUTION
   const [formData, setFormData] = useState({
@@ -588,6 +588,91 @@ GRAIN, Rice, 1000, POUND, 2025-01-01</pre>
             {t('survey.submit')}
           </button>
         </div>
+
+        {/* Historical Survey Items */}
+        {surveyHistory.length > 0 && (
+          <div className="historical-survey-items" style={{ marginTop: '32px', padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+            <h4 style={{ margin: '0 0 16px 0', color: '#293c47', fontSize: '1.1em', fontWeight: '600' }}>
+              Previously Submitted Items ({surveyHistory.length} submissions)
+            </h4>
+            <div className="submissions-list" style={{ display: 'grid', gap: '16px' }}>
+              {surveyHistory.slice(0, 10).map((submission, submissionIndex) => (
+                <div key={submissionIndex} className="submission-card" style={{ 
+                  padding: '16px', 
+                  backgroundColor: 'white', 
+                  borderRadius: '8px', 
+                  border: '1px solid #dee2e6',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}>
+                  <div className="submission-header" style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '12px',
+                    paddingBottom: '8px',
+                    borderBottom: '1px solid #e9ecef'
+                  }}>
+                    <div>
+                      <span style={{ fontWeight: '600', color: '#293c47' }}>
+                        {submission.type === 'SINGLE' ? 'Single Item' : 'Bulk Import'}
+                      </span>
+                      <span style={{ color: '#6c757d', marginLeft: '8px' }}>
+                        {submission.source}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.9em', color: '#6c757d' }}>
+                      {new Date(submission.timestamp).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="submission-items" style={{ display: 'grid', gap: '8px' }}>
+                    {submission.items && submission.items.length > 0 ? (
+                      submission.items.map((item, itemIndex) => (
+                        <div key={itemIndex} className="historical-item" style={{ 
+                          padding: '8px 12px', 
+                          backgroundColor: '#f8f9fa', 
+                          borderRadius: '4px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div className="item-info">
+                            <span style={{ fontWeight: '500', color: '#293c47' }}>
+                              {item.product || 'Unnamed Item'}
+                            </span>
+                            <span style={{ color: '#6c757d', marginLeft: '8px' }}>
+                              {item.quantity} {item.unit}
+                            </span>
+                            {item.foodType && (
+                              <span style={{ 
+                                color: '#c4a464', 
+                                marginLeft: '8px', 
+                                fontSize: '0.8em',
+                                backgroundColor: 'rgba(196, 164, 100, 0.1)',
+                                padding: '2px 6px',
+                                borderRadius: '3px'
+                              }}>
+                                {item.foodType}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ color: '#6c757d', fontStyle: 'italic' }}>
+                        No items recorded
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {surveyHistory.length > 10 && (
+              <div style={{ marginTop: '12px', textAlign: 'center', color: '#6c757d', fontSize: '0.9em' }}>
+                Showing 10 of {surveyHistory.length} submissions
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
       
