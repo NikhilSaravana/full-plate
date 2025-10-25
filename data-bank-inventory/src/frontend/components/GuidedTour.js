@@ -490,7 +490,17 @@ const GuidedTour = ({ isOpen, onClose, onStartTour, onNavigate }) => {
         <div className="tour-step-content">
           <div className="tour-step-header">
             <h3>{currentStepData.title}</h3>
-            <span className="tour-step-counter">{currentStep + 1} of {tourSteps.length}</span>
+            <div className="tour-step-header-right">
+              <span className="tour-step-counter">{currentStep + 1} of {tourSteps.length}</span>
+              <button 
+                className="tour-step-close-btn" 
+                onClick={onClose}
+                aria-label="Close tour"
+                title="Close tour"
+              >
+                ×
+              </button>
+            </div>
           </div>
           <div className="tour-step-body">
             <p>{currentStepData.content}</p>

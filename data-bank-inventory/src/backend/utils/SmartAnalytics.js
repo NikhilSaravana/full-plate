@@ -270,14 +270,7 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
   };
 
   const getRecommendationIcon = (type) => {
-    switch (type) {
-      case 'critical': return '🚨';
-      case 'warning': return '⚠️';
-      case 'success': return '✅';
-      case 'info': return 'ℹ️';
-      case 'strategic': return '🎯';
-      default: return '📊';
-    }
+    return '';
   };
 
   const getPriorityColor = (priority) => {
@@ -290,19 +283,13 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
   };
 
   const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'inventory': return '📦';
-      case 'distribution': return '🚚';
-      case 'demographics': return '👥';
-      case 'operations': return '⚙️';
-      default: return '📈';
-    }
+    return '';
   };
 
   return (
     <div className="smart-analytics">
       <div className="analytics-header">
-        <h2>📊 Smart Analytics</h2>
+        <h2>Smart Analytics</h2>
         <p>Get intelligent insights and recommendations based on your data patterns</p>
       </div>
 
@@ -319,7 +306,7 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
             </>
           ) : (
             <>
-              📈 Generate Smart Recommendations
+              Generate Smart Recommendations
             </>
           )}
         </button>
@@ -327,7 +314,7 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
 
       {recommendations && (
         <div className="analytics-recommendations">
-          <h3>🎯 Smart Recommendations</h3>
+          <h3>Smart Recommendations</h3>
           <div className="recommendations-grid">
             {recommendations.map((rec, index) => (
               <div key={index} className={`recommendation-card ${rec.type}`}>
@@ -366,11 +353,11 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
 
       {analysisData && (
         <div className="analytics-data">
-          <h3>📊 Data Analysis Summary</h3>
+          <h3>Data Analysis Summary</h3>
           <div className="analysis-grid">
             {analysisData.inventory && (
               <div className="analysis-section">
-                <h4>📦 Inventory Analysis</h4>
+                <h4>Inventory Analysis</h4>
                 <ul>
                   <li>Total Items: {analysisData.inventory.totalItems}</li>
                   <li>Total Weight: {analysisData.inventory.totalWeight.toFixed(0)} lbs</li>
@@ -382,7 +369,7 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
             
             {analysisData.distribution && (
               <div className="analysis-section">
-                <h4>🚚 Distribution Analysis</h4>
+                <h4>Distribution Analysis</h4>
                 <ul>
                   <li>Total Distributions: {analysisData.distribution.totalDistributions}</li>
                   <li>Total Distributed: {analysisData.distribution.totalDistributed.toFixed(0)} lbs</li>
@@ -393,7 +380,7 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
             
             {analysisData.survey && (
               <div className="analysis-section">
-                <h4>👥 Demographics Analysis</h4>
+                <h4>Demographics Analysis</h4>
                 <ul>
                   <li>Total Recipients: {analysisData.survey.totalRecipients}</li>
                   <li>Primary Age Group: {analysisData.survey.mostCommonAgeGroup}</li>
