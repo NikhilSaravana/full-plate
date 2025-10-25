@@ -1,17 +1,17 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { LanguageProvider } from './contexts/LanguageContext';
-import { NotificationProvider } from './contexts/NotificationContext';
-import Dashboard from './Components/Dashboard';
-import Login from './Components/Auth/Login';
-import Register from './Components/Auth/Register';
-import ForgotPassword from './Components/Auth/ForgotPassword';
-import HelpButton from './Components/HelpButton';
-import GlobalSearch from './Components/GlobalSearch';
-import NotificationContainer from './Components/NotificationContainer';
-import KeyboardShortcuts from './Components/KeyboardShortcuts';
-import './App.css';
+import { AuthProvider, useAuth } from './backend/contexts/AuthContext';
+import { LanguageProvider } from './backend/contexts/LanguageContext';
+import { NotificationProvider } from './backend/contexts/NotificationContext';
+import Dashboard from './frontend/pages/Dashboard';
+import Login from './frontend/components/Auth/Login';
+import Register from './frontend/components/Auth/Register';
+import ForgotPassword from './frontend/components/Auth/ForgotPassword';
+import HelpButton from './frontend/components/HelpButton';
+import GlobalSearch from './frontend/components/GlobalSearch';
+import NotificationContainer from './frontend/components/NotificationContainer';
+import KeyboardShortcuts from './frontend/components/KeyboardShortcuts';
+import './frontend/styles/App.css';
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
