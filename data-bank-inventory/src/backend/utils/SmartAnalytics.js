@@ -370,7 +370,7 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
           <div className="analysis-grid">
             {analysisData.inventory && (
               <div className="analysis-section">
-                <h4>Inventory Analysis</h4>
+                <h4>📦 Inventory Analysis</h4>
                 <ul>
                   <li>Total Items: {analysisData.inventory.totalItems}</li>
                   <li>Total Weight: {analysisData.inventory.totalWeight.toFixed(0)} lbs</li>
@@ -382,7 +382,7 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
             
             {analysisData.distribution && (
               <div className="analysis-section">
-                <h4>Distribution Analysis</h4>
+                <h4>🚚 Distribution Analysis</h4>
                 <ul>
                   <li>Total Distributions: {analysisData.distribution.totalDistributions}</li>
                   <li>Total Distributed: {analysisData.distribution.totalDistributed.toFixed(0)} lbs</li>
@@ -393,7 +393,7 @@ const SmartAnalytics = ({ inventoryData, distributionData, surveyData }) => {
             
             {analysisData.survey && (
               <div className="analysis-section">
-                <h4>Demographics Analysis</h4>
+                <h4>👥 Demographics Analysis</h4>
                 <ul>
                   <li>Total Recipients: {analysisData.survey.totalRecipients}</li>
                   <li>Primary Age Group: {analysisData.survey.mostCommonAgeGroup}</li>
